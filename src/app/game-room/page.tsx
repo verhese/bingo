@@ -6,8 +6,9 @@ import { Board } from '@/components/Board';
 import { GameSessionBar } from '@/components/GameSessionBar';
 import type { GameVariant } from '@/types/game';
 import { VARIANTS } from '@/lib/variants';
+import { getWebSocketUrl } from '@/lib/websocketUrl';
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
+const WS_URL = getWebSocketUrl();
 
 export default function GameRoomPage() {
   const { state } = useGameSession(WS_URL);

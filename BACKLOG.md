@@ -111,7 +111,8 @@ All core files are now implemented and functional:
 - [ ] "Bingo!" call verification UI in AdminPanel  
 - [ ] Drawn-number history list (scrollable)
 - [ ] Board responsive cell sizing
-- [ ] Production readiness (.gitignore, ESLint, tests, Docker compose)
+- [x] Synology NAS Docker deployment (`Dockerfile`, `compose.yaml`, and deployment guide)
+- [ ] Production readiness (ESLint configuration and tests)
 - [ ] Accessibility audit (WCAG contrast, screen readers, keyboard nav)
 
 ---

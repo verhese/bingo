@@ -5,8 +5,9 @@ import { useGameSession } from '@/lib/useGameSession';
 import { VariantSelector } from '@/components/VariantSelector';
 import { VARIANTS } from '@/lib/variants';
 import type { GameVariant } from '@/types/game';
+import { getWebSocketUrl } from '@/lib/websocketUrl';
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
+const WS_URL = getWebSocketUrl();
 
 export default function AdminPanelPage() {
   const [variant, setVariant] = useState<GameVariant>('90-ball');

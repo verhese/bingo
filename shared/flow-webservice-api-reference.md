@@ -2,7 +2,7 @@
 
 ## Game session
 
-All endpoints use the shared WebSocket game service at `NEXT_PUBLIC_WS_URL`.
+All endpoints use the shared WebSocket game service at `GAME_SERVER_WS_URL`. It defaults to `ws://localhost:3001` for local development; Docker Compose supplies `ws://ws-server:3001` for the internal container network.
 
 ### `GET /api/game`
 

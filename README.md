@@ -37,6 +37,25 @@ npm run dev
 npm run dev:ws
 ```
 
+### Synology NAS Deployment
+
+The included [compose.yaml](compose.yaml) runs the web app and its WebSocket game service as separate containers. In Synology Container Manager, create a project from this repository folder and use `compose.yaml` as the project file.
+
+Publish both container ports on the NAS:
+
+| NAS port | Service | Purpose |
+|---|---|---|
+| `3000` | `web` | Bingo application |
+| `3001` | `ws-server` | Live game updates for browsers |
+
+For a normal LAN installation, leave `NEXT_PUBLIC_WS_URL` blank in `.env`; clients will connect to the same NAS hostname on port `3001`. When using a reverse proxy or a custom public address, set it before building the project, for example:
+
+```env
+NEXT_PUBLIC_WS_URL=wss://bingo.example.com:3001
+```
+
+The Compose file configures `GAME_SERVER_WS_URL=ws://ws-server:3001` internally. Do not expose that Docker service hostname to browsers.
+
 ### Project Structure
 
 ```

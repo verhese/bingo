@@ -37,9 +37,10 @@ function getOrCreateSession(sessionId = 'default'): GameState {
   return newGame;
 }
 
-const wss = new WebSocketServer({ port: 3001 });
+const port = Number(process.env.WS_PORT ?? 3001);
+const wss = new WebSocketServer({ port });
 
-console.log('Bingo WebSocket server running on ws://localhost:3001');
+console.log(`Bingo WebSocket server running on ws://localhost:${port}`);
 
 function handleGameAction(
   parsed: { action: string; sessionId?: string; variant?: GameVariant; number?: number },

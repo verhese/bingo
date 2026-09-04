@@ -75,18 +75,15 @@ export function generate90BallCard(_count: number = 1): { row: number[]; blanks:
     const pool = Array.from({ length: max - min + 1 }, (_, i) => min + i);
 
     // Decide how many rows get a number in this column (at least 1)
-    // @ts-expect-error - Math.random is safe for client-side bingo card generation
     const numInCol = Math.floor(Math.random() * 3) + 1; // 1-3
     // Shuffle which rows get it
     const rowIndices = [0, 1, 2].sort(() => {
-      // @ts-expect-error - Math.random is safe for client-side bingo card generation
       return Math.random() - 0.5;
     }).slice(0, numInCol);
 
     for (const rowIndex of rowIndices) {
       if (card[rowIndex].blanks[col]) continue; // skip if blank
       // Pick random number from pool
-      // @ts-expect-error - Math.random is safe for client-side bingo card generation
       const pickIdx = Math.floor(Math.random() * pool.length);
       card[rowIndex].row[col] = pool[pickIdx];
     }

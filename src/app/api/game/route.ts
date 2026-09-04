@@ -1,1 +1,1 @@
-export { GET, POST, runtime } from '@/server/api/game/route';
+export { GET, POST } from '@/server/api/game/route';

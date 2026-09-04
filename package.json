@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "dev:ws": "tsx src/server/ws-server.ts",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0",
+    "start:ws": "tsx src/server/ws-server.ts",
     "lint": "eslint ."
   },
   "dependencies": {

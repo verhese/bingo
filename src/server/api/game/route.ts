@@ -3,9 +3,7 @@ import WebSocket, { type RawData } from 'ws';
 import { VARIANTS } from '@/lib/variants';
 import type { GameState, GameVariant } from '@/types/game';
 
-export const runtime = 'nodejs';
-
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
+const WS_URL = process.env.GAME_SERVER_WS_URL || 'ws://localhost:3001';
 
 function parseGameState(data: RawData): GameState {
   let text: string;
