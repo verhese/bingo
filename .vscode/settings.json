@@ -1,0 +1,12 @@
+{
+  "files.exclude": {
+    "**/*.pyc": true,
+    "**/__pycache__": true
+  },
+  "python.analysis.ignore": [
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.js",
+    "**/*.jsx"
+  ]
+}

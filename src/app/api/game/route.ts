@@ -1,0 +1,1 @@
+export { GET, POST, runtime } from '@/server/api/game/route';
