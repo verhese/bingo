@@ -107,7 +107,7 @@ All core files are now implemented and functional:
 
 ## 📋 FUTURE ENHANCEMENTS (Not Yet Started)
 
-- [ ] PDF export for print-ready cards
+- [x] PDF export for print-ready cards
 - [ ] "Bingo!" call verification UI in AdminPanel  
 - [ ] Drawn-number history list (scrollable)
 - [ ] Board responsive cell sizing

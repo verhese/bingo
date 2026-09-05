@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Variant selector (90-ball, 75-ball, Speedy Bingo)
 - Live sync across all room screens
 - Printable player card generation
+- PDF download for generated print-ready player cards
+- Printable card-set name labels beneath each card grid
 
 ### Changed
 
