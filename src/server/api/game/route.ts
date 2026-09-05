@@ -3,7 +3,7 @@ import WebSocket, { type RawData } from 'ws';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
 import { normalizeRoomId } from '@/lib/gameRoom';
-import type { GameState, GameVariant } from '@/types/game';
+import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 
 const WS_URL = process.env.GAME_SERVER_WS_URL || 'ws://localhost:3001';
 
@@ -25,8 +25,9 @@ function parseResponseText(data: RawData): string {
 
 function requestGameState(
   message: {
-    action: 'draw' | 'call-number' | 'reset' | 'change-variant' | 'verify-bingo' | 'ping';
+    action: 'create-session' | 'draw' | 'call-number' | 'reset' | 'change-variant' | 'verify-bingo' | 'ping';
     sessionId?: string;
+    roomName?: string;
     variant?: GameVariant;
     number?: number;
     claimedNumbers?: number[];
@@ -48,16 +49,16 @@ function requestGameState(
   });
 }
 
-function requestSessionIds(): Promise<string[]> {
+function requestSessions(): Promise<RoomSummary[]> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(WS_URL);
 
     socket.once('open', () => socket.send(JSON.stringify({ action: 'list-sessions' })));
     socket.on('message', (data) => {
-      const response = JSON.parse(parseResponseText(data)) as { sessionIds?: unknown };
+      const response = JSON.parse(parseResponseText(data)) as { sessions?: unknown };
       socket.close();
-      if (Array.isArray(response.sessionIds) && response.sessionIds.every((sessionId) => typeof sessionId === 'string')) {
-        resolve(response.sessionIds);
+      if (Array.isArray(response.sessions)) {
+        resolve(response.sessions as RoomSummary[]);
         return;
       }
       reject(new Error('Invalid game service session list'));
@@ -72,8 +73,9 @@ function requestSessionIds(): Promise<string[]> {
 // POST /api/game — Handles draw and reset actions
 export async function POST(req: NextRequest) {
   let body: {
-    action: 'draw' | 'call-number' | 'reset' | 'change-variant' | 'verify-bingo';
+    action: 'create-session' | 'draw' | 'call-number' | 'reset' | 'change-variant' | 'verify-bingo';
     sessionId?: string;
+    roomName?: string;
     variant?: GameVariant;
     number?: number;
     claimedNumbers?: number[];
@@ -85,10 +87,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
   }
 
-  const { action, variant, number, claimedNumbers } = body;
+  const { action, roomName, variant, number, claimedNumbers } = body;
   const sessionId = normalizeRoomId(body.sessionId);
 
-  if (!['draw', 'call-number', 'reset', 'change-variant', 'verify-bingo'].includes(action)) {
+  if (!['create-session', 'draw', 'call-number', 'reset', 'change-variant', 'verify-bingo'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
   if (action === 'change-variant' && (!variant || !VARIANTS[variant])) {
@@ -127,7 +129,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const gameState = await requestGameState({ action, sessionId, variant, number, claimedNumbers });
+    const gameState = await requestGameState({ action, sessionId, roomName, variant, number, claimedNumbers });
     return NextResponse.json({ gameState });
   } catch {
     return NextResponse.json({ error: 'Game service is unavailable' }, { status: 503 });
@@ -138,8 +140,8 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   if (req.nextUrl.searchParams.get('rooms') === 'true') {
     try {
-      const sessionIds = await requestSessionIds();
-      return NextResponse.json({ sessionIds });
+      const sessions = await requestSessions();
+      return NextResponse.json({ sessions });
     } catch {
       return NextResponse.json({ error: 'Game service is unavailable' }, { status: 503 });
     }

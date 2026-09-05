@@ -11,6 +11,7 @@ import type { GameVariant } from '@/types/game';
 import { VARIANTS } from '@/lib/variants';
 import { normalizeRoomId } from '@/lib/gameRoom';
 import { getWebSocketUrl } from '@/lib/websocketUrl';
+import type { RoomSummary } from '@/types/game';
 
 const WS_URL = getWebSocketUrl();
 
@@ -18,7 +19,7 @@ function GameRoom() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const roomId = normalizeRoomId(searchParams.get('room'));
-  const [roomIds, setRoomIds] = useState<string[]>([roomId]);
+  const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const { state } = useGameSession(WS_URL, roomId);
   const variant = (state?.variant as GameVariant) ?? '90-ball';
   const cfg = VARIANTS[variant];
@@ -30,10 +31,9 @@ function GameRoom() {
       try {
         const response = await fetch('/api/game?rooms=true');
         if (!response.ok) return;
-        const result = (await response.json()) as { sessionIds?: unknown };
-        if (!Array.isArray(result.sessionIds) || !isCurrent) return;
-        const sessionIds = result.sessionIds.filter((id): id is string => typeof id === 'string');
-        setRoomIds(Array.from(new Set([roomId, ...sessionIds])).sort());
+        const result = (await response.json()) as { sessions?: unknown };
+        if (!Array.isArray(result.sessions) || !isCurrent) return;
+        setRooms(result.sessions as RoomSummary[]);
       } catch {
         // Keep the current room available if the room list cannot be loaded.
       }
@@ -49,11 +49,15 @@ function GameRoom() {
     router.push(`/game-room?room=${encodeURIComponent(nextRoomId)}`);
   };
 
+  const availableRooms = rooms.some((room) => room.sessionId === roomId)
+    ? rooms
+    : [{ sessionId: roomId, roomName: roomId, variant, drawnCount: 0, status: 'waiting' as const }, ...rooms];
+
   return (
     <main className="game-room">
       <GameSessionBar
         roomId={roomId}
-        roomIds={roomIds}
+        rooms={availableRooms}
         onRoomChange={handleRoomChange}
         variant={cfg.name}
         drawnCount={state?.drawnNumbers.length ?? 0}

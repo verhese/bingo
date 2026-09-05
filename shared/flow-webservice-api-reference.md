@@ -2,7 +2,7 @@
 
 ## Game sessions
 
-All endpoints use the shared WebSocket game service at `GAME_SERVER_WS_URL`. It defaults to `ws://localhost:3001` for local development; Docker Compose supplies `ws://ws-server:3001` for the internal container network. Each room has an isolated game session identified by a lowercase slug of up to 32 characters. Omitting `sessionId` selects the `default` room.
+All endpoints use the shared WebSocket game service at `GAME_SERVER_WS_URL`. It defaults to `ws://localhost:3001` for local development; Docker Compose supplies `ws://ws-server:3001` for the internal container network. Each room has an isolated game session with a stable URL-safe ID and a human-readable `roomName`. Omitting `sessionId` selects the `default` room.
 
 ### `GET /api/game?sessionId=hall-a`
 
@@ -22,11 +22,11 @@ Returns the selected room's game session.
 
 ### `GET /api/game?rooms=true`
 
-Returns all active room identifiers for room selectors. The `default` room is always included.
+Returns summaries for all active rooms. The `default` room is always included.
 
 ```json
 {
-  "sessionIds": ["default", "hall-a", "lobby"]
+  "sessions": [{ "sessionId": "hall-a", "roomName": "Main Hall", "variant": "90-ball", "drawnCount": 12, "status": "in-play" }]
 }
 ```
 
@@ -36,6 +36,7 @@ Accepts a JSON body with one of these actions:
 
 ```json
 { "action": "draw", "sessionId": "default" }
+{ "action": "create-session", "roomName": "Main Hall" }
 { "action": "call-number", "number": 42, "sessionId": "default" }
 { "action": "verify-bingo", "claimedNumbers": [12, 24, 38, 54, 69], "sessionId": "default" }
 { "action": "reset", "sessionId": "default" }

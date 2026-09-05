@@ -2,8 +2,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { VARIANTS } from '@/lib/variants';
 import { generateAllNumbers, getNextNumber } from '@/lib/bingoNumbers';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
-import { DEFAULT_ROOM_ID, normalizeRoomId } from '@/lib/gameRoom';
-import type { GameState, GameVariant } from '@/types/game';
+import { DEFAULT_ROOM_ID, normalizeRoomId, normalizeRoomName } from '@/lib/gameRoom';
+import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 
 interface GameSession {
   gameState: GameState;
@@ -16,11 +16,13 @@ const gameSessions = new Map<string, GameSession>();
 function createNewGame(
   variant: GameVariant = '90-ball',
   sessionId = DEFAULT_ROOM_ID,
+  roomName = sessionId,
 ): GameState {
   const cfg = VARIANTS[variant];
   if (!cfg) throw new Error(`Unknown variant: ${variant}`);
   return {
     sessionId,
+    roomName,
     variant,
     drawnNumbers: [],
     status: 'waiting',
@@ -33,12 +35,40 @@ function getOrCreateSession(sessionId?: string): GameState {
   if (gameSessions.has(normalizedSessionId)) {
     return gameSessions.get(normalizedSessionId)!.gameState;
   }
-  const newGame = createNewGame('90-ball', normalizedSessionId);
+  const newGame = createNewGame('90-ball', normalizedSessionId, normalizedSessionId);
   gameSessions.set(newGame.sessionId, {
     gameState: newGame,
     allNumbers: generateAllNumbers(VARIANTS[newGame.variant].maxNumber),
   });
   return newGame;
+}
+
+function createSession(roomName?: string): GameState {
+  const normalizedRoomName = normalizeRoomName(roomName);
+  const baseId = normalizeRoomId(normalizedRoomName.replace(/\s+/g, '-'));
+  let sessionId = baseId === DEFAULT_ROOM_ID ? `room-${Date.now()}` : baseId;
+  let suffix = 2;
+  while (gameSessions.has(sessionId)) {
+    sessionId = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+  const gameState = createNewGame('90-ball', sessionId, normalizedRoomName);
+  gameSessions.set(sessionId, {
+    gameState,
+    allNumbers: generateAllNumbers(VARIANTS[gameState.variant].maxNumber),
+  });
+  return gameState;
+}
+
+function getSessionSummaries(): RoomSummary[] {
+  getOrCreateSession();
+  return Array.from(gameSessions.values(), ({ gameState }) => ({
+    sessionId: gameState.sessionId,
+    roomName: gameState.roomName,
+    variant: gameState.variant,
+    drawnCount: gameState.drawnNumbers.length,
+    status: gameState.status,
+  })).sort((first, second) => first.roomName.localeCompare(second.roomName));
 }
 
 const port = Number(process.env.WS_PORT ?? 3001);
@@ -61,8 +91,10 @@ function broadcastSessionState(gameState: GameState, sender: WebSocket) {
 }
 
 function handleGameAction(
-  parsed: { action: string; sessionId?: string; variant?: GameVariant; number?: number; claimedNumbers?: number[] },
+  parsed: { action: string; sessionId?: string; roomName?: string; variant?: GameVariant; number?: number; claimedNumbers?: number[] },
 ): GameState | null {
+  if (parsed.action === 'create-session') return createSession(parsed.roomName);
+
   const session = getOrCreateSession(parsed.sessionId);
   const sessionData = gameSessions.get(session.sessionId);
   if (!sessionData) return null;
@@ -127,6 +159,7 @@ wss.on('connection', (ws: WebSocket) => {
     let parsed: {
       action: string;
       sessionId?: string;
+      roomName?: string;
       variant?: GameVariant;
       number?: number;
       claimedNumbers?: number[];
@@ -145,8 +178,7 @@ wss.on('connection', (ws: WebSocket) => {
     }
 
     if (parsed.action === 'list-sessions') {
-      getOrCreateSession();
-      ws.send(JSON.stringify({ sessionIds: Array.from(gameSessions.keys()).sort() }));
+      ws.send(JSON.stringify({ sessions: getSessionSummaries() }));
       return;
     }
 

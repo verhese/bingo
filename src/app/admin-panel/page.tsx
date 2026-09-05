@@ -8,7 +8,7 @@ import { VariantSelector } from '@/components/VariantSelector';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoClaim, type BingoClaimResult } from '@/lib/bingoClaim';
 import { normalizeRoomId } from '@/lib/gameRoom';
-import type { GameVariant } from '@/types/game';
+import type { GameVariant, RoomSummary } from '@/types/game';
 import { getWebSocketUrl } from '@/lib/websocketUrl';
 
 const WS_URL = getWebSocketUrl();
@@ -18,7 +18,8 @@ function AdminPanel() {
   const searchParams = useSearchParams();
   const roomId = normalizeRoomId(searchParams.get('room'));
   const [variant, setVariant] = useState<GameVariant>('90-ball');
-  const [roomInput, setRoomInput] = useState(roomId);
+  const [rooms, setRooms] = useState<RoomSummary[]>([]);
+  const [newRoomName, setNewRoomName] = useState('');
   const [manualNumber, setManualNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [claimNumbers, setClaimNumbers] = useState(['', '', '', '', '']);
@@ -30,19 +31,39 @@ function AdminPanel() {
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
 
   useEffect(() => {
-    setRoomInput(roomId);
     setVariant('90-ball');
+    const loadRooms = async () => {
+      try {
+        const response = await fetch('/api/game?rooms=true');
+        if (!response.ok) return;
+        const result = (await response.json()) as { sessions?: RoomSummary[] };
+        if (Array.isArray(result.sessions)) setRooms(result.sessions);
+      } catch {
+        // The active room remains available while the directory is unavailable.
+      }
+    };
+    void loadRooms();
   }, [roomId]);
 
   useEffect(() => {
     if (state) setVariant(state.variant);
   }, [state]);
 
-  const handleRoomChange = (event: React.SyntheticEvent<HTMLFormElement>) => {
+  const handleCreateRoom = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const nextRoomId = normalizeRoomId(roomInput);
-    setRoomInput(nextRoomId);
-    router.push(`/admin-panel?room=${encodeURIComponent(nextRoomId)}`);
+    try {
+      const response = await fetch('/api/game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create-session', roomName: newRoomName }),
+      });
+      if (!response.ok) throw new Error('Unable to create the room');
+      const result = (await response.json()) as { gameState: RoomSummary };
+      setNewRoomName('');
+      router.push(`/admin-panel?room=${encodeURIComponent(result.gameState.sessionId)}`);
+    } catch (createError) {
+      setServiceError(createError instanceof Error ? createError.message : 'Unable to create the room');
+    }
   };
 
   const handleVariantChange = async (newVariant: GameVariant) => {
@@ -174,25 +195,19 @@ function AdminPanel() {
       )}
       <h1 className="mb-8 heading-lg font-bold text-bingo-text">Admin Panel</h1>
       <div className="flex flex-col gap-6">
-        <form onSubmit={handleRoomChange} className="flex flex-col gap-2">
-          <label htmlFor="room-id" className="font-bold text-bingo-text">Room</label>
+        <section className="flex flex-col gap-3">
+          <label htmlFor="room-id" className="font-bold text-bingo-text">Active room</label>
           <div className="flex flex-wrap items-center gap-3">
-            <input
+            <select
               id="room-id"
-              type="text"
-              value={roomInput}
-              onChange={(event) => setRoomInput(event.target.value)}
-              pattern="[a-z0-9][a-z0-9\-]{0,31}"
-              maxLength={32}
+              value={roomId}
+              onChange={(event) => router.push(`/admin-panel?room=${encodeURIComponent(event.target.value)}`)}
               className="w-56 rounded border-2 border-bingo-muted bg-bingo-surface px-4 py-3 text-xl font-bold text-bingo-text"
-              required
-            />
-            <button
-              type="submit"
-              className="rounded-lg border-2 border-bingo-accent px-5 py-3 text-lg font-bold text-bingo-accent hover:bg-bingo-accent hover:text-bingo-bg"
             >
-              Open Room
-            </button>
+              {(rooms.some((room) => room.sessionId === roomId) ? rooms : [{ sessionId: roomId, roomName: roomId, variant, drawnCount: 0, status: 'waiting' as const }, ...rooms]).map((room) => (
+                <option key={room.sessionId} value={room.sessionId}>{room.roomName} - {room.variant}, {room.drawnCount} called</option>
+              ))}
+            </select>
             <a
               href={`/game-room?room=${encodeURIComponent(roomId)}`}
               target="_blank"
@@ -202,7 +217,12 @@ function AdminPanel() {
               Open Game Room
             </a>
           </div>
-        </form>
+          <form onSubmit={handleCreateRoom} className="flex flex-wrap items-center gap-3">
+            <label htmlFor="new-room-name" className="font-bold text-bingo-text">New room</label>
+            <input id="new-room-name" type="text" value={newRoomName} onChange={(event) => setNewRoomName(event.target.value)} maxLength={40} className="w-56 rounded border-2 border-bingo-muted bg-bingo-surface px-4 py-3 text-xl font-bold text-bingo-text" required />
+            <button type="submit" className="rounded-lg bg-bingo-accent px-5 py-3 text-lg font-bold text-bingo-bg hover:opacity-90">Create Room</button>
+          </form>
+        </section>
         <VariantSelector current={variant} onChange={handleVariantChange} />
         <form onSubmit={handleManualCall} className="flex flex-col gap-3">
           <label htmlFor="manual-number" className="font-bold text-bingo-text">
