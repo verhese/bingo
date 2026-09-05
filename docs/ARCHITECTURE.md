@@ -39,7 +39,7 @@ The service keeps sessions in a process-local `Map`. It does not use a database,
 |---|---|
 | `/game-room` | Shows a selectable room, current variant/status/count, theme toggle, large caller display, number board, verified Bingo announcement, and full reverse-chronological draw history. |
 | `/admin-panel` | Lets callers select or create rooms, draw or manually call a number, change variant, reset, verify a five-number Bingo line, and view five recent calls. `Space` draws and `R` resets outside form fields. |
-| `/player-card` | Generates standalone 75-ball or 90-ball card sets. It does not subscribe to a game room or automatically mark calls. |
+| `/player-card` | Generates card sets for a selected 75-ball or 90-ball room. It loads the room directory to use the selected display name as the printed card-set name and its variant as the card layout, but does not subscribe to the room or automatically mark calls. |
 
 `Board.tsx` is one conditional-layout component for 90-ball, 75-ball, and Speedy Bingo boards. `CallerDisplay.tsx` uses a polite live region for the current number. `ThemeToggle.tsx` stores the selected light or dark theme in browser local storage.
 

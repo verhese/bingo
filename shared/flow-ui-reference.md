@@ -4,7 +4,7 @@
 
 `useGameSession` selects a room from the page `room` query parameter, loads its initial state through `GET /api/game?sessionId=...`, then subscribes over WebSocket with `{ "action": "subscribe", "sessionId": ... }`. Omitted or invalid IDs use `default`. `getWebSocketUrl` uses `NEXT_PUBLIC_WS_URL` when present; otherwise it connects to the page hostname on port `3001`, using `wss` for HTTPS pages.
 
-The game room and admin panel both show the active room as a query parameter. The admin panel lists the available room summaries and can create a room from a name; the game room lists rooms in its session bar. The directory is fetched when the selected room changes, so newly created rooms become visible after navigation or a subsequent room selection.
+The game room and admin panel both show the active room as a query parameter. The admin panel lists the available room summaries and can create a room from a name; the game room lists rooms in its session bar. A created room is inserted into the admin selector immediately, and directory refreshes make newly created rooms available in the other room selectors.
 
 ## Game room
 
@@ -33,4 +33,4 @@ The default is a high-contrast light theme with white caller surfaces, dark text
 
 ## Player cards
 
-`PlayerCardPage` is independent of live game sessions. It generates 75-ball or 90-ball card sets with a selectable quantity (1, 2, 3, 4, 5, 6, 8, or 10), optional card-set name, browser print action, replacement-card action, and multi-page A4 PDF download. A supplied set name appears beneath every displayed card; generated cards do not show individual card numbers. Speedy Bingo cards are not available.
+`PlayerCardPage` loads the room directory from `GET /api/game?rooms=true` and lets the operator select a 75-ball or 90-ball room for a card set. The selected room's display name is the set name printed beneath every card and its variant determines the generated card layout; neither value can be changed independently. The room directory refreshes when the selector receives focus, making rooms created elsewhere available without a page reload. The page has a selectable quantity (1, 2, 3, 4, 5, 6, 8, or 10), browser print action, replacement-card action, and multi-page A4 PDF download. Generated cards do not show individual card numbers. Speedy Bingo rooms are not available for player-card generation.

@@ -41,7 +41,7 @@ Returns the selected room as `{ "gameState": GameState }`. The request creates t
 
 ### `GET /api/game?rooms=true`
 
-Returns `{ "sessions": RoomSummary[] }`, sorted by room name. The default room is created and included when the directory is first requested.
+Returns `{ "sessions": RoomSummary[] }`, sorted by room name. The default room is created and included when the directory is first requested. The game room, admin panel, and player-card room selector use this directory; player cards use the selected 75-ball or 90-ball summary's `roomName` as their printed card-set name and its `variant` as the generated card layout.
 
 ### `POST /api/game`
 

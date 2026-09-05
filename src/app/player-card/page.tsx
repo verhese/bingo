@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Download, Printer, RefreshCw } from 'lucide-react';
-import type { GameVariant } from '@/types/game';
+import type { GameVariant, RoomSummary } from '@/types/game';
 import { FREE_SPACE, generate75BallCard, generate90BallCard } from '@/lib/generateCard';
 
 const FREE_CELL = FREE_SPACE;
@@ -78,7 +78,8 @@ function CardGrid90({ cards, cardSetName }: { readonly cards: Card90[]; cardSetN
 export default function PlayerCardPage() {
   const [variant, setVariant] = useState<GameVariant>('90-ball');
   const [cardCount, setCardCount] = useState(6);
-  const [cardSetName, setCardSetName] = useState('');
+  const [rooms, setRooms] = useState<RoomSummary[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState('');
   const [cards75, setCards75] = useState<Card75[]>([]);
   const [cards90, setCards90] = useState<Card90[]>([]);
   const [isExporting, setIsExporting] = useState(false);
@@ -91,6 +92,24 @@ export default function PlayerCardPage() {
     setCards90(create90BallCards(cardCount));
     setPrintedDate(new Date().toLocaleDateString());
   }, []);
+
+  const loadRooms = useCallback(async () => {
+    try {
+      const response = await fetch('/api/game?rooms=true');
+      if (!response.ok) return;
+      const result = (await response.json()) as { sessions?: RoomSummary[] };
+      if (Array.isArray(result.sessions)) setRooms(result.sessions);
+    } catch {
+      // Card generation remains available if the room directory is unavailable.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRooms();
+  }, [loadRooms]);
+
+  const cardSetName = rooms.find((room) => room.sessionId === selectedRoomId)?.roomName ?? '';
+  const supportedRooms = rooms.filter((room) => room.variant === '75-ball' || room.variant === '90-ball');
 
   const handlePrint = () => {
     window.print();
@@ -155,15 +174,6 @@ export default function PlayerCardPage() {
       {/* Controls */}
       <div className="flex w-full items-center justify-center gap-4 bg-bingo-surface p-4">
         <select
-          value={variant}
-          onChange={(e) => setVariant(e.target.value as GameVariant)}
-          className="rounded border border-bingo-muted bg-bingo-bg px-4 py-2 text-xl text-bingo-text"
-        >
-          <option value="90-ball">90-ball</option>
-          <option value="75-ball">75-ball</option>
-        </select>
-
-        <select
           value={cardCount}
           onChange={(e) => handleCardCountChange(Number(e.target.value))}
           className="rounded border border-bingo-muted bg-bingo-bg px-4 py-2 text-xl text-bingo-text"
@@ -173,16 +183,23 @@ export default function PlayerCardPage() {
           ))}
         </select>
 
-        <label className="sr-only" htmlFor="card-set-name">Card set name</label>
-        <input
-          id="card-set-name"
-          type="text"
-          value={cardSetName}
-          onChange={(e) => setCardSetName(e.target.value)}
-          placeholder="Card set name"
-          maxLength={40}
-          className="w-52 rounded border border-bingo-muted bg-bingo-bg px-4 py-2 text-xl text-bingo-text placeholder:text-bingo-muted"
-        />
+        <label className="sr-only" htmlFor="card-set-room">Card set room</label>
+        <select
+          id="card-set-room"
+          value={selectedRoomId}
+          onChange={(event) => {
+            const room = supportedRooms.find((candidate) => candidate.sessionId === event.target.value);
+            setSelectedRoomId(event.target.value);
+            if (room) setVariant(room.variant);
+          }}
+          onFocus={() => void loadRooms()}
+          className="w-52 rounded border border-bingo-muted bg-bingo-bg px-4 py-2 text-xl text-bingo-text"
+        >
+          <option value="">Select room</option>
+          {supportedRooms.map((room) => (
+            <option key={room.sessionId} value={room.sessionId}>{room.roomName} - {room.variant}</option>
+          ))}
+        </select>
 
         <button
           type="button"

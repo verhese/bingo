@@ -9,7 +9,7 @@ import { VariantSelector } from '@/components/VariantSelector';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoClaim, type BingoClaimResult } from '@/lib/bingoClaim';
 import { normalizeRoomId } from '@/lib/gameRoom';
-import type { GameVariant, RoomSummary } from '@/types/game';
+import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 import { getWebSocketUrl } from '@/lib/websocketUrl';
 
 const WS_URL = getWebSocketUrl();
@@ -59,7 +59,17 @@ function AdminPanel() {
         body: JSON.stringify({ action: 'create-session', roomName: newRoomName }),
       });
       if (!response.ok) throw new Error('Unable to create the room');
-      const result = (await response.json()) as { gameState: RoomSummary };
+      const result = (await response.json()) as { gameState: GameState };
+      setRooms((currentRooms) => [
+        ...currentRooms.filter((room) => room.sessionId !== result.gameState.sessionId),
+        {
+          sessionId: result.gameState.sessionId,
+          roomName: result.gameState.roomName,
+          variant: result.gameState.variant,
+          drawnCount: result.gameState.drawnNumbers.length,
+          status: result.gameState.status,
+        },
+      ].sort((first, second) => first.roomName.localeCompare(second.roomName)));
       setNewRoomName('');
       router.push(`/admin-panel?room=${encodeURIComponent(result.gameState.sessionId)}`);
     } catch (createError) {
