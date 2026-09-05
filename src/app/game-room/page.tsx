@@ -23,7 +23,11 @@ export default function GameRoomPage() {
         status={state?.status ?? 'waiting'}
       />
       <CallerDisplay number={state?.drawnNumbers[state?.drawnNumbers.length - 1] ?? null} />
-      <Board maxNumber={cfg.maxNumber} drawnNumbers={state?.drawnNumbers ?? []} />
+      <Board
+        maxNumber={cfg.maxNumber}
+        drawnNumbers={state?.drawnNumbers ?? []}
+        verifiedBingo={state?.verifiedBingo?.claimedNumbers}
+      />
     </main>
   );
 }

@@ -108,7 +108,7 @@ All core files are now implemented and functional:
 ## 📋 FUTURE ENHANCEMENTS (Not Yet Started)
 
 - [x] PDF export for print-ready cards
-- [ ] "Bingo!" call verification UI in AdminPanel  
+- [x] "Bingo!" call verification UI in AdminPanel  
 - [ ] Drawn-number history list (scrollable)
 - [ ] Board responsive cell sizing
 - [x] Synology NAS Docker deployment (`Dockerfile`, `compose.yaml`, and deployment guide)

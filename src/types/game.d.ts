@@ -3,6 +3,11 @@ export interface GameState {
   variant: GameVariant;
   drawnNumbers: number[];
   status: 'waiting' | 'in-play' | 'complete';
+  verifiedBingo: VerifiedBingo | null;
+}
+
+export interface VerifiedBingo {
+  claimedNumbers: number[];
 }
 
 export type GameVariant = '90-ball' | '75-ball' | 'speedy';

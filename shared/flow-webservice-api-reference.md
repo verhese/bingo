@@ -14,7 +14,8 @@ Returns the active game session.
     "sessionId": "default",
     "variant": "90-ball",
     "drawnNumbers": [],
-    "status": "waiting"
+    "status": "waiting",
+    "verifiedBingo": null
   }
 }
 ```
@@ -26,8 +27,9 @@ Accepts a JSON body with one of these actions:
 ```json
 { "action": "draw", "sessionId": "default" }
 { "action": "call-number", "number": 42, "sessionId": "default" }
+{ "action": "verify-bingo", "claimedNumbers": [12, 24, 38, 54, 69], "sessionId": "default" }
 { "action": "reset", "sessionId": "default" }
 { "action": "change-variant", "variant": "75-ball", "sessionId": "default" }
 ```
 
-Each successful request returns the updated `gameState`. `call-number` accepts an uncalled whole number within the active variant's range. Invalid JSON, unsupported actions, unknown variants, duplicate numbers, and invalid number ranges return `400`; an unavailable game service returns `503`.
+Each successful request returns the updated `gameState`. `call-number` accepts an uncalled whole number within the active variant's range. `verify-bingo` accepts exactly five unique, previously called numbers within the active variant's range; when accepted, `gameState.verifiedBingo` contains the claimed line and is broadcast to all game-room clients. Calling another number, resetting the game, or changing its variant clears the verified Bingo. Invalid JSON, unsupported actions, unknown variants, duplicate numbers, invalid number ranges, and unverifiable Bingo claims return `400`; an unavailable game service returns `503`.

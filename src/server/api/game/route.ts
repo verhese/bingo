@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import WebSocket, { type RawData } from 'ws';
 import { VARIANTS } from '@/lib/variants';
+import { verifyBingoNumbers } from '@/lib/bingoClaim';
 import type { GameState, GameVariant } from '@/types/game';
 
 const WS_URL = process.env.GAME_SERVER_WS_URL || 'ws://localhost:3001';
@@ -19,10 +20,11 @@ function parseGameState(data: RawData): GameState {
 
 function requestGameState(
   message: {
-    action: 'draw' | 'call-number' | 'reset' | 'change-variant' | 'ping';
+    action: 'draw' | 'call-number' | 'reset' | 'change-variant' | 'verify-bingo' | 'ping';
     sessionId?: string;
     variant?: GameVariant;
     number?: number;
+    claimedNumbers?: number[];
   },
 ): Promise<GameState> {
   return new Promise((resolve, reject) => {
@@ -50,10 +52,11 @@ function requestGameState(
 // POST /api/game — Handles draw and reset actions
 export async function POST(req: NextRequest) {
   let body: {
-    action: 'draw' | 'call-number' | 'reset' | 'change-variant';
+    action: 'draw' | 'call-number' | 'reset' | 'change-variant' | 'verify-bingo';
     sessionId?: string;
     variant?: GameVariant;
     number?: number;
+    claimedNumbers?: number[];
   };
 
   try {
@@ -62,9 +65,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
   }
 
-  const { action, sessionId, variant, number } = body;
+  const { action, sessionId, variant, number, claimedNumbers } = body;
 
-  if (!['draw', 'call-number', 'reset', 'change-variant'].includes(action)) {
+  if (!['draw', 'call-number', 'reset', 'change-variant', 'verify-bingo'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
   if (action === 'change-variant' && (!variant || !VARIANTS[variant])) {
@@ -91,7 +94,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const gameState = await requestGameState({ action, sessionId, variant, number });
+    if (action === 'verify-bingo') {
+      const currentState = await requestGameState({ action: 'ping', sessionId });
+      const verification = verifyBingoNumbers(
+        Array.isArray(claimedNumbers) ? claimedNumbers : [],
+        currentState.drawnNumbers,
+        currentState.variant,
+      );
+      if (!verification.isVerified) {
+        return NextResponse.json({ error: 'The claimed line cannot be verified' }, { status: 400 });
+      }
+    }
+
+    const gameState = await requestGameState({ action, sessionId, variant, number, claimedNumbers });
     return NextResponse.json({ gameState });
   } catch {
     return NextResponse.json({ error: 'Game service is unavailable' }, { status: 503 });

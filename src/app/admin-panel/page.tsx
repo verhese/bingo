@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { X } from 'lucide-react';
 import { useGameSession } from '@/lib/useGameSession';
 import { VariantSelector } from '@/components/VariantSelector';
 import { VARIANTS } from '@/lib/variants';
+import { verifyBingoClaim, type BingoClaimResult } from '@/lib/bingoClaim';
 import type { GameVariant } from '@/types/game';
 import { getWebSocketUrl } from '@/lib/websocketUrl';
 
@@ -13,6 +15,10 @@ export default function AdminPanelPage() {
   const [variant, setVariant] = useState<GameVariant>('90-ball');
   const [manualNumber, setManualNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [claimNumbers, setClaimNumbers] = useState(['', '', '', '', '']);
+  const [claimResult, setClaimResult] = useState<BingoClaimResult | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
   const { drawNumber, callNumber, state } = useGameSession(WS_URL);
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
 
@@ -42,8 +48,39 @@ export default function AdminPanelPage() {
     }
   };
 
+  const handleClaimVerification = async (event: React.SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setClaimError(null);
+    const verification = verifyBingoClaim(claimNumbers.join(','), state?.drawnNumbers ?? [], state?.variant ?? variant);
+    if (!verification.isVerified) {
+      setClaimResult(verification);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify-bingo', sessionId: state?.sessionId, claimedNumbers: verification.claimedNumbers }),
+      });
+      if (!response.ok) {
+        const result = (await response.json()) as { error?: string };
+        throw new Error(result.error ?? 'Unable to verify the Bingo call');
+      }
+      setClaimResult(verification);
+    } catch (verificationError) {
+      setClaimResult(null);
+      setClaimError(verificationError instanceof Error ? verificationError.message : 'Unable to verify the Bingo call');
+    }
+  };
+
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape' && isVerifyDialogOpen) {
+      setIsVerifyDialogOpen(false);
+      return;
+    }
+
     // Ignore if user is typing in an input/select
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
 
@@ -58,7 +95,7 @@ export default function AdminPanelPage() {
         body: JSON.stringify({ action: 'reset' }),
       }).then(() => alert('Game reset!'));
     }
-  }, [drawNumber]);
+  }, [drawNumber, isVerifyDialogOpen]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -104,6 +141,13 @@ export default function AdminPanelPage() {
         </button>
         <button
           type="button"
+          onClick={() => setIsVerifyDialogOpen(true)}
+          className="rounded-lg border-2 border-bingo-success px-6 py-3 text-xl font-bold text-bingo-success hover:bg-bingo-success hover:text-bingo-bg"
+        >
+          Verify Bingo
+        </button>
+        <button
+          type="button"
           onClick={() => {
             fetch('/api/game', {
               method: 'POST',
@@ -120,6 +164,95 @@ export default function AdminPanelPage() {
           <kbd className="rounded bg-bingo-surface px-1.5 py-0.5 font-mono text-base">R</kbd> = Reset
         </p>
       </div>
+      {isVerifyDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="verify-bingo-title"
+            aria-describedby="verify-bingo-description"
+            className="w-full max-w-2xl rounded-lg border-2 border-white/30 bg-bingo-surface p-6 shadow-2xl"
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="verify-bingo-title" className="text-3xl font-bold text-bingo-text">Verify a Bingo call</h2>
+                <p id="verify-bingo-description" className="mt-1 text-lg text-bingo-muted">Enter the five numbers in the claimed winning line.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsVerifyDialogOpen(false)}
+                title="Close verification dialog"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border-2 border-white/30 text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
+              >
+                <X className="h-6 w-6" aria-hidden="true" />
+                <span className="sr-only">Close</span>
+              </button>
+            </div>
+            <form onSubmit={handleClaimVerification} className="flex flex-col gap-4">
+              <fieldset>
+                <legend className="mb-2 font-bold text-bingo-text">Winning line numbers</legend>
+                <div className="grid grid-cols-5 gap-3">
+                  {claimNumbers.map((number, index) => (
+                    <input
+                      key={index}
+                      type="number"
+                      inputMode="numeric"
+                      min="1"
+                      max={maxNumber}
+                      step="1"
+                      autoFocus={index === 0}
+                      value={number}
+                      onChange={(event) => {
+                        setClaimNumbers((numbers) => numbers.map((value, numberIndex) => (
+                          numberIndex === index ? event.target.value : value
+                        )));
+                        setClaimResult(null);
+                        setClaimError(null);
+                      }}
+                      aria-label={`Winning line number ${index + 1}`}
+                      className="min-w-0 rounded-lg border-2 border-white/30 bg-bingo-bg px-2 py-3 text-center text-xl font-bold text-bingo-text"
+                      required
+                    />
+                  ))}
+                </div>
+              </fieldset>
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsVerifyDialogOpen(false)}
+                  className="rounded-lg border-2 border-white/30 px-6 py-3 text-xl font-bold text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-bingo-success px-6 py-3 text-xl font-bold text-bingo-bg hover:opacity-90"
+                >
+                  Verify Bingo
+                </button>
+              </div>
+              {claimResult && (
+                <div
+                  role="status"
+                  className={claimResult.isVerified ? 'border-l-4 border-bingo-success bg-bingo-success/15 p-3 text-bingo-text' : 'border-l-4 border-red-300 bg-red-300/10 p-3 text-bingo-text'}
+                >
+                  {claimResult.isVerified ? (
+                    <p className="font-bold text-bingo-success">Bingo verified. Every number in this line has been called.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="font-bold text-red-300">This call cannot be verified yet.</p>
+                      {claimResult.claimedNumbers.length !== 5 && <p>Enter exactly five numbers from one winning line.</p>}
+                      {claimResult.invalidNumbers.length > 0 && <p>Invalid or repeated numbers: {claimResult.invalidNumbers.join(', ')}.</p>}
+                      {claimResult.missingNumbers.length > 0 && <p>Not called: {claimResult.missingNumbers.join(', ')}.</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+              {claimError && <p role="alert" className="font-bold text-red-300">{claimError}</p>}
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

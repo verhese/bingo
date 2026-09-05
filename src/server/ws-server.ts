@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { VARIANTS } from '@/lib/variants';
 import { generateAllNumbers, getNextNumber } from '@/lib/bingoNumbers';
+import { verifyBingoNumbers } from '@/lib/bingoClaim';
 import type { GameState, GameVariant } from '@/types/game';
 
 interface GameSession {
@@ -22,6 +23,7 @@ function createNewGame(
     variant,
     drawnNumbers: [],
     status: 'waiting',
+    verifiedBingo: null,
   };
 }
 
@@ -43,7 +45,7 @@ const wss = new WebSocketServer({ port });
 console.log(`Bingo WebSocket server running on ws://localhost:${port}`);
 
 function handleGameAction(
-  parsed: { action: string; sessionId?: string; variant?: GameVariant; number?: number },
+  parsed: { action: string; sessionId?: string; variant?: GameVariant; number?: number; claimedNumbers?: number[] },
 ): GameState | null {
   const session = getOrCreateSession(parsed.sessionId);
   const sessionData = gameSessions.get(session.sessionId);
@@ -52,7 +54,10 @@ function handleGameAction(
   if (parsed.action === 'draw') {
     if (session.status === 'waiting') session.status = 'in-play';
     const nextNum = getNextNumber(sessionData.allNumbers, session.drawnNumbers);
-    if (nextNum !== null) session.drawnNumbers.push(nextNum);
+    if (nextNum !== null) {
+      session.drawnNumbers.push(nextNum);
+      session.verifiedBingo = null;
+    }
     else session.status = 'complete';
     return { ...session };
   }
@@ -60,6 +65,19 @@ function handleGameAction(
   if (parsed.action === 'call-number' && typeof parsed.number === 'number') {
     if (session.status === 'waiting') session.status = 'in-play';
     session.drawnNumbers.push(parsed.number);
+    session.verifiedBingo = null;
+    return { ...session };
+  }
+
+  if (parsed.action === 'verify-bingo') {
+    const verification = verifyBingoNumbers(
+      parsed.claimedNumbers ?? [],
+      session.drawnNumbers,
+      session.variant,
+    );
+    if (!verification.isVerified) return null;
+
+    session.verifiedBingo = { claimedNumbers: verification.claimedNumbers };
     return { ...session };
   }
 
@@ -97,6 +115,7 @@ wss.on('connection', (ws: WebSocket) => {
       sessionId?: string;
       variant?: GameVariant;
       number?: number;
+      claimedNumbers?: number[];
     };
     try {
       parsed = JSON.parse(data.toString());
