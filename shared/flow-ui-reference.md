@@ -2,7 +2,7 @@
 
 ## Game-session integration
 
-`useGameSession` subscribes to the WebSocket game service for live state updates. `getWebSocketUrl` uses `NEXT_PUBLIC_WS_URL` when set; otherwise it connects to the current browser hostname on port `3001`, choosing `wss` for HTTPS pages. The admin panel uses `POST /api/game` to call a caller-entered number, draw a random number, verify a Bingo call, reset, and change the active variant; the game room rerenders from broadcast game state. Failures from these admin actions, including an unavailable game service, appear in a dismissible alert notification rather than as uncaught browser errors.
+`useGameSession` loads the selected room's current state through `GET /api/game?sessionId=...` and subscribes to the WebSocket game service for live updates. `getWebSocketUrl` uses `NEXT_PUBLIC_WS_URL` when set; otherwise it connects to the current browser hostname on port `3001`, choosing `wss` for HTTPS pages. The `room` query parameter selects a named session, such as `/admin-panel?room=hall-a` and `/game-room?room=hall-a`; no parameter uses the `default` room. The admin panel has a room control for switching to a named room and opening its matching projector URL. The game-room session bar uses `GET /api/game?rooms=true` to populate a room dropdown; selecting a room navigates the display to its session. The admin panel uses `POST /api/game` to call a caller-entered number, draw a random number, verify a Bingo call, reset, and change the active variant; the game room rerenders only from broadcasts for its selected room. Failures from these admin actions, including an unavailable game service, appear in a dismissible alert notification rather than as uncaught browser errors.
 
 ## Display theme
 

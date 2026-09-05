@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { VARIANTS } from '@/lib/variants';
 import { generateAllNumbers, getNextNumber } from '@/lib/bingoNumbers';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
+import { DEFAULT_ROOM_ID, normalizeRoomId } from '@/lib/gameRoom';
 import type { GameState, GameVariant } from '@/types/game';
 
 interface GameSession {
@@ -14,7 +15,7 @@ const gameSessions = new Map<string, GameSession>();
 
 function createNewGame(
   variant: GameVariant = '90-ball',
-  sessionId = 'default',
+  sessionId = DEFAULT_ROOM_ID,
 ): GameState {
   const cfg = VARIANTS[variant];
   if (!cfg) throw new Error(`Unknown variant: ${variant}`);
@@ -27,11 +28,12 @@ function createNewGame(
   };
 }
 
-function getOrCreateSession(sessionId = 'default'): GameState {
-  if (gameSessions.has(sessionId)) {
-    return gameSessions.get(sessionId)!.gameState;
+function getOrCreateSession(sessionId?: string): GameState {
+  const normalizedSessionId = normalizeRoomId(sessionId);
+  if (gameSessions.has(normalizedSessionId)) {
+    return gameSessions.get(normalizedSessionId)!.gameState;
   }
-  const newGame = createNewGame('90-ball', sessionId);
+  const newGame = createNewGame('90-ball', normalizedSessionId);
   gameSessions.set(newGame.sessionId, {
     gameState: newGame,
     allNumbers: generateAllNumbers(VARIANTS[newGame.variant].maxNumber),
@@ -41,8 +43,22 @@ function getOrCreateSession(sessionId = 'default'): GameState {
 
 const port = Number(process.env.WS_PORT ?? 3001);
 const wss = new WebSocketServer({ port });
+const clientSessionIds = new WeakMap<WebSocket, string>();
 
 console.log(`Bingo WebSocket server running on ws://localhost:${port}`);
+
+function broadcastSessionState(gameState: GameState, sender: WebSocket) {
+  const message = JSON.stringify(gameState);
+  wss.clients.forEach((client) => {
+    if (
+      client !== sender
+      && client.readyState === WebSocket.OPEN
+      && clientSessionIds.get(client) === gameState.sessionId
+    ) {
+      client.send(message);
+    }
+  });
+}
 
 function handleGameAction(
   parsed: { action: string; sessionId?: string; variant?: GameVariant; number?: number; claimedNumbers?: number[] },
@@ -107,8 +123,6 @@ function handleGameAction(
 wss.on('connection', (ws: WebSocket) => {
   console.log('Client connected. Total clients:', wss.clients.size);
 
-  ws.send(JSON.stringify(getOrCreateSession()));
-
   ws.on('message', (data: Buffer) => {
     let parsed: {
       action: string;
@@ -123,6 +137,19 @@ wss.on('connection', (ws: WebSocket) => {
       return; // Ignore malformed messages
     }
 
+    if (parsed.action === 'subscribe') {
+      const session = getOrCreateSession(parsed.sessionId);
+      clientSessionIds.set(ws, session.sessionId);
+      ws.send(JSON.stringify(session));
+      return;
+    }
+
+    if (parsed.action === 'list-sessions') {
+      getOrCreateSession();
+      ws.send(JSON.stringify({ sessionIds: Array.from(gameSessions.keys()).sort() }));
+      return;
+    }
+
     if (parsed.action === 'ping') {
       ws.send(JSON.stringify(getOrCreateSession(parsed.sessionId)));
       return;
@@ -131,12 +158,8 @@ wss.on('connection', (ws: WebSocket) => {
     const broadcastState = handleGameAction(parsed);
 
     if (broadcastState) {
-      const msg = JSON.stringify(broadcastState);
-      wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(msg);
-        }
-      });
+      ws.send(JSON.stringify(broadcastState));
+      broadcastSessionState(broadcastState, ws);
     }
   });
 

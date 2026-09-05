@@ -1,18 +1,24 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useGameSession } from '@/lib/useGameSession';
 import { VariantSelector } from '@/components/VariantSelector';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoClaim, type BingoClaimResult } from '@/lib/bingoClaim';
+import { normalizeRoomId } from '@/lib/gameRoom';
 import type { GameVariant } from '@/types/game';
 import { getWebSocketUrl } from '@/lib/websocketUrl';
 
 const WS_URL = getWebSocketUrl();
 
-export default function AdminPanelPage() {
+function AdminPanel() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const roomId = normalizeRoomId(searchParams.get('room'));
   const [variant, setVariant] = useState<GameVariant>('90-ball');
+  const [roomInput, setRoomInput] = useState(roomId);
   const [manualNumber, setManualNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [claimNumbers, setClaimNumbers] = useState(['', '', '', '', '']);
@@ -20,8 +26,24 @@ export default function AdminPanelPage() {
   const [claimError, setClaimError] = useState<string | null>(null);
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
-  const { drawNumber, callNumber, state } = useGameSession(WS_URL);
+  const { drawNumber, callNumber, state } = useGameSession(WS_URL, roomId);
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
+
+  useEffect(() => {
+    setRoomInput(roomId);
+    setVariant('90-ball');
+  }, [roomId]);
+
+  useEffect(() => {
+    if (state) setVariant(state.variant);
+  }, [state]);
+
+  const handleRoomChange = (event: React.SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextRoomId = normalizeRoomId(roomInput);
+    setRoomInput(nextRoomId);
+    router.push(`/admin-panel?room=${encodeURIComponent(nextRoomId)}`);
+  };
 
   const handleVariantChange = async (newVariant: GameVariant) => {
     setServiceError(null);
@@ -29,7 +51,7 @@ export default function AdminPanelPage() {
       const response = await fetch('/api/game', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'change-variant', variant: newVariant }),
+        body: JSON.stringify({ action: 'change-variant', sessionId: roomId, variant: newVariant }),
       });
 
       if (!response.ok) {
@@ -58,7 +80,7 @@ export default function AdminPanelPage() {
       const response = await fetch('/api/game', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reset', sessionId: state?.sessionId }),
+        body: JSON.stringify({ action: 'reset', sessionId: roomId }),
       });
       if (!response.ok) {
         const result = (await response.json()) as { error?: string };
@@ -95,7 +117,7 @@ export default function AdminPanelPage() {
       const response = await fetch('/api/game', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify-bingo', sessionId: state?.sessionId, claimedNumbers: verification.claimedNumbers }),
+        body: JSON.stringify({ action: 'verify-bingo', sessionId: roomId, claimedNumbers: verification.claimedNumbers }),
       });
       if (!response.ok) {
         const result = (await response.json()) as { error?: string };
@@ -152,6 +174,35 @@ export default function AdminPanelPage() {
       )}
       <h1 className="mb-8 heading-lg font-bold text-bingo-text">Admin Panel</h1>
       <div className="flex flex-col gap-6">
+        <form onSubmit={handleRoomChange} className="flex flex-col gap-2">
+          <label htmlFor="room-id" className="font-bold text-bingo-text">Room</label>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              id="room-id"
+              type="text"
+              value={roomInput}
+              onChange={(event) => setRoomInput(event.target.value)}
+              pattern="[a-z0-9][a-z0-9\-]{0,31}"
+              maxLength={32}
+              className="w-56 rounded border-2 border-bingo-muted bg-bingo-surface px-4 py-3 text-xl font-bold text-bingo-text"
+              required
+            />
+            <button
+              type="submit"
+              className="rounded-lg border-2 border-bingo-accent px-5 py-3 text-lg font-bold text-bingo-accent hover:bg-bingo-accent hover:text-bingo-bg"
+            >
+              Open Room
+            </button>
+            <a
+              href={`/game-room?room=${encodeURIComponent(roomId)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg border-2 border-bingo-muted px-5 py-3 text-lg font-bold text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
+            >
+              Open Game Room
+            </a>
+          </div>
+        </form>
         <VariantSelector current={variant} onChange={handleVariantChange} />
         <form onSubmit={handleManualCall} className="flex flex-col gap-3">
           <label htmlFor="manual-number" className="font-bold text-bingo-text">
@@ -294,5 +345,13 @@ export default function AdminPanelPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminPanelPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-bingo-bg" />}>
+      <AdminPanel />
+    </Suspense>
   );
 }

@@ -63,7 +63,7 @@ body {
 
 .game-session-bar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   gap: 1rem;
   align-items: center;
   padding: 1rem 1.5rem;
@@ -75,7 +75,27 @@ body {
 }
 
 .game-session-bar span:nth-child(2) { text-align: center; }
-.game-session-bar span:nth-child(3) { color: var(--bingo-accent); text-align: right; }
+.game-session-bar span:nth-child(3) { text-align: center; }
+.game-session-bar span:nth-child(4) { color: var(--bingo-accent); text-align: right; }
+
+.game-session-room {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.game-session-room select {
+  min-width: 0;
+  max-width: 11rem;
+  padding: 0.35rem 1.75rem 0.35rem 0.5rem;
+  background: var(--bingo-bg);
+  border: 2px solid var(--bingo-border);
+  border-radius: 6px;
+  color: var(--bingo-text);
+  font: inherit;
+  font-weight: 700;
+}
 
 .caller-display {
   display: grid;
@@ -268,7 +288,7 @@ body {
 @media (max-width: 640px) {
   .game-room { grid-template-rows: auto 11rem auto; }
   .game-session-bar { grid-template-columns: 1fr; gap: 0.35rem; text-align: center; }
-  .game-session-bar span:nth-child(2), .game-session-bar span:nth-child(3) { text-align: center; }
+  .game-session-bar span:nth-child(2), .game-session-bar span:nth-child(3), .game-session-bar span:nth-child(4) { text-align: center; }
   .theme-toggle { justify-self: center; }
   .bingo-board--90 { --board-columns: 6; --board-rows: 15; }
   .bingo-board--75 { --board-columns: 6; --board-rows: 13; }

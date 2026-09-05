@@ -68,16 +68,12 @@ Shows current session info: variant, numbers drawn count, game status (waiting /
 
 ### Live Sync
 
-All screens subscribe to the same game session via WebSocket. When the caller draws a number:
+Each named room has an isolated game session. Screens select a room with the `room` query parameter and subscribe to that room over WebSocket. When a caller draws a number:
 
 1. Caller clicks "Draw" in AdminPanel
 2. Game Engine picks next available number (variant-aware)
-3. WebSocket broadcasts `{ drawnNumber, sessionId, variant }`
-4. All connected clients re-render instantly (SWR + SWR subscription or direct WS listener)
-
-### Planned Enhancements
-
-The current implementation uses one shared game session and provides persistent high-contrast light and dark display themes. Future work will support multiple concurrent sessions. Each session will need isolated game state and WebSocket broadcasts, allowing separate rooms to operate independently.
+3. WebSocket broadcasts the updated state only to clients in that room
+4. Matching room clients re-render instantly (SWR + SWR subscription or direct WS listener)
 
 ## Key Design Decisions
 
