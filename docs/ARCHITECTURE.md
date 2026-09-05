@@ -1,113 +1,50 @@
 # Architecture
 
-This document describes the system architecture of Bingo — a web app to support bingo afternoons for our non-profit.
+## Overview
 
-## High-Level Overview
+Bingo is a Next.js App Router application backed by a separate Node WebSocket service. The WebSocket service owns the in-memory game state for every room. The Next.js HTTP route provides a validated command and snapshot interface, while browser clients receive live updates by subscribing directly to the service.
 
-```
-┌─────────────────────────────────────────────────────┐
-│                 Admin Panel / Caller                  │
-│  ┌──────────────┐       ┌─────────────────────────┐ │
-│  │  Admin UI    │       │  Number Caller Button   │ │
-│  │ (variant     │       │         (click to draw) │ │
-│  │  selector,   │       └──────────┬──────────────┘ │
-│  │  game mgmt)  │                  │                │
-│  └──────────────┘                  ▼                │
-└─────────────────────────┬───────────────────────────┘
-                          │  WebSocket / SSE
-                          ▼
-┌─────────────────────────────────────────────────────┐
-│               Game Engine Service                    │
-│  ┌───────────┐ ┌───────────┐ ┌──────────────────┐  │
-│  │ Number    │ │ Variant   │ │ Session Manager  │  │
-│  │ Generator │ │ Registry  │ │                  │  │
-│  └───────────┘ └───────────┘ └──────────────────┘  │
-└────────────────────────┬────────────────────────────┘
-                         │
-        ┌────────────────┼────────────────┐
-        ▼                ▼                ▼
-┌──────────────┐ ┌─────────────┐ ┌──────────────┐
-│ Game Room    │ │ Player      │ │  Board       │
-│ (projector   │ │ Cards API   │ │  State Store │
-│  view)       │ │             │ │              │
-└──────────────┘ └─────────────┘ └──────────────┘
+```mermaid
+flowchart LR
+  Admin[Admin panel] -->|HTTP POST /api/game| Api[Next.js game route]
+  Room[Game room] -->|HTTP GET /api/game| Api
+  Api -->|WebSocket command| Service[WebSocket game service]
+  Admin -->|subscribe| Service
+  Room -->|subscribe| Service
+  Service -->|room-scoped GameState| Admin
+  Service -->|room-scoped GameState| Room
 ```
 
-## Core Components
+## Runtime components
 
-### CallerDisplay (`src/components/CallerDisplay.tsx`)
+| Component | Location | Responsibility |
+|---|---|---|
+| Next.js pages | `src/app/` | Renders `/game-room`, `/admin-panel`, and `/player-card`; `/` redirects to the game room. |
+| HTTP game route | `src/server/api/game/route.ts` | Validates public API calls and proxies them to the WebSocket service. Re-exported at `src/app/api/game/route.ts`. |
+| Game service | `src/server/ws-server.ts` | Creates, stores, mutates, and broadcasts isolated room sessions. Listens on `WS_PORT` or `3001`. |
+| Session hook | `src/lib/useGameSession.ts` | Fetches an initial state from the HTTP API and sends a WebSocket `subscribe` message for updates. |
+| Game-domain modules | `src/lib/` | Defines variants, number selection, card generation, room normalization, and Bingo-claim validation. |
 
-Shows the number just drawn at a very large size (200px+). High-contrast colour scheme. Announces nothing by sound — visual only.
+## Rooms and state
 
-### Board (`src/components/Board.tsx`)
+The `room` browser query parameter corresponds to the API and WebSocket `sessionId`. `normalizeRoomId` accepts lower-case IDs of up to 32 characters containing letters, numbers, and hyphens; invalid or omitted values become `default`.
 
-A grid showing all numbers for the current variant. Drawn numbers are highlighted; undrawn numbers remain visible but muted.
+Each `GameState` contains a session ID, display name, variant, ordered `drawnNumbers`, status, and optional verified Bingo line. Its status changes from `waiting` to `in-play` when a number is called and becomes `complete` only after a draw is requested when no numbers remain. A reset keeps the variant but clears all calls. Changing a variant also clears all calls.
 
-```
-boards/
-├── Bingo90Board.tsx      # 90-ball layout (1-90)
-├── Bingo75Board.tsx      # 75-ball layout (1-75)
-└── BoardBase.tsx         # Shared grid rendering logic
-```
+The service keeps sessions in a process-local `Map`. It does not use a database, so service restarts discard room sessions, their names, and their history. It also has no authentication or authorization mechanism.
 
-### VariantSelector (`src/components/VariantSelector.tsx`)
+## Client surfaces
 
-Admin-only dropdown to switch the active game variant. Prevents accidental mid-game changes.
-
-### GameSessionBar (`src/components/GameSessionBar.tsx`)
-
-Shows current session info: variant, numbers drawn count, game status (waiting / in-play / complete).
-
-### Pages
-
-| Page | Purpose |
+| Route | Behavior |
 |---|---|
-| `GameRoom` | Full-screen display for the room projector. Shows CallerDisplay + Board side by side. |
-| `AdminPanel` | Controls: draw number, reset board, pick variant, generate player cards. Locked to admin role. |
-| `PlayerCard` | Renders a printable bingo card layout (A4). Can also be viewed on-screen for digital players. |
+| `/game-room` | Shows a selectable room, current variant/status/count, theme toggle, large caller display, number board, verified Bingo announcement, and full reverse-chronological draw history. |
+| `/admin-panel` | Lets callers select or create rooms, draw or manually call a number, change variant, reset, verify a five-number Bingo line, and view five recent calls. `Space` draws and `R` resets outside form fields. |
+| `/player-card` | Generates standalone 75-ball or 90-ball card sets. It does not subscribe to a game room or automatically mark calls. |
 
-### Live Sync
+`Board.tsx` is one conditional-layout component for 90-ball, 75-ball, and Speedy Bingo boards. `CallerDisplay.tsx` uses a polite live region for the current number. `ThemeToggle.tsx` stores the selected light or dark theme in browser local storage.
 
-Each named room has an isolated game session. Screens select a room with the `room` query parameter and subscribe to that room over WebSocket. When a caller draws a number:
+## Deployment
 
-1. Caller clicks "Draw" in AdminPanel
-2. Game Engine picks next available number (variant-aware)
-3. WebSocket broadcasts the updated state only to clients in that room
-4. Matching room clients re-render instantly (SWR + SWR subscription or direct WS listener)
+Docker Compose runs `web` and `ws-server` as separate containers. The web container reaches the service through `GAME_SERVER_WS_URL=ws://ws-server:3001`. Browsers connect either through `NEXT_PUBLIC_WS_URL` or the current page hostname on port `3001`, using `wss` when the page uses HTTPS.
 
-## Key Design Decisions
-
-| Decision | Rationale |
-|---|---|
-| Large fonts / high contrast | Players have hearing and vision challenges — visual clarity is critical. |
-| No sound dependency | Hearing-impaired players must not miss anything. |
-| SWR for state fetching | Automatic revalidation keeps all screens in sync without polling. |
-| Variant-aware number pool | 90-ball = numbers 1–90, 75-ball = 1–75, etc. Board + generator adapt to variant. |
-| Admin-locked actions | Only the caller can draw numbers or change variants during a game. |
-
-## Data Flow
-
-```
-Caller (AdminPanel)
-    │ click "Draw"
-    ▼
-Game Engine → pick next number → validate against drawn set
-    │
-    ├──► WebSocket broadcast (live room screens update)
-    ├──► Persist drawn set to DB
-    └──► Emit 'numberDrawn' event
-        │
-        ├─► GameRoom page: CallerDisplay + Board re-render
-        ├─► Player cards: auto-ink matched numbers
-        └─► AdminPanel: update drawn count, check for wins
-```
-
-## Accessibility Considerations
-
-| Concern | Solution |
-|---|---|
-| Hard of hearing | No sound required; all info visual |
-| Poor vision | 200px caller number, high-contrast palette, large grid cells (min 48×48px) |
-| Motor impairment | Keyboard shortcuts for admin: `Space` = draw, `R` = reset |
-| Cognitive load | One variant at a time; clear visual distinction between game states |
-
+For exact request, response, and WebSocket message contracts, see [../shared/flow-webservice-api-reference.md](../shared/flow-webservice-api-reference.md).

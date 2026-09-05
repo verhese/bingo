@@ -2,26 +2,35 @@
 
 ## Game-session integration
 
-`useGameSession` loads the selected room's current state through `GET /api/game?sessionId=...` and subscribes to the WebSocket game service for live updates. `getWebSocketUrl` uses `NEXT_PUBLIC_WS_URL` when set; otherwise it connects to the current browser hostname on port `3001`, choosing `wss` for HTTPS pages. The `room` query parameter selects a named session, such as `/admin-panel?room=hall-a` and `/game-room?room=hall-a`; no parameter uses the `default` room. The admin panel provides a readable active-room selector with each room's variant and drawn count, plus a separate new-room control that accepts a display name and lets the service create its internal ID. It also shows the five most recently called numbers for the active room, newest first. The game-room session bar uses `GET /api/game?rooms=true` to populate a room dropdown with display names. The admin panel uses `POST /api/game` to call a caller-entered number, draw a random number, verify a Bingo call, reset, and change the active variant; the game room rerenders only from broadcasts for its selected room. Failures from these admin actions, including an unavailable game service, appear in a dismissible alert notification rather than as uncaught browser errors.
+`useGameSession` selects a room from the page `room` query parameter, loads its initial state through `GET /api/game?sessionId=...`, then subscribes over WebSocket with `{ "action": "subscribe", "sessionId": ... }`. Omitted or invalid IDs use `default`. `getWebSocketUrl` uses `NEXT_PUBLIC_WS_URL` when present; otherwise it connects to the page hostname on port `3001`, using `wss` for HTTPS pages.
 
-## Display theme
+The game room and admin panel both show the active room as a query parameter. The admin panel lists the available room summaries and can create a room from a name; the game room lists rooms in its session bar. The directory is fetched when the selected room changes, so newly created rooms become visible after navigation or a subsequent room selection.
 
-The app starts in a high-contrast light theme for projection: white page and caller surfaces, dark text, slate borders, deep-amber controls, and bright yellow drawn-number cells. An icon button in the game-room session banner switches between light and dark themes. The selected theme is stored in browser local storage, so a projector keeps its preference after a refresh.
+## Game room
 
-## Responsive board
+`GameRoomPage` renders `GameSessionBar`, `CallerDisplay`, `Board`, and `DrawHistory` for the selected room. The session bar shows room, variant, number count, status, and an icon-only theme control. `CallerDisplay` displays the latest called number or an em dash before the first call, using a polite ARIA live region.
 
-`Board` applies a grid density tailored to its active variant and available space. Wide game-room displays use 15 columns for 90-ball and 75-ball boards; the layout reduces columns at tablet and phone breakpoints to retain readable cells. Each variant defines its grid rows as well as columns, so the board fills the available panel height without overflowing. Cell type scales to the board container rather than the viewport, and the phone game room reserves a stable caller-display height so the board follows directly below it without horizontal overflow.
+`Board` is a single component with layouts for 90-ball, 75-ball, and Speedy Bingo. It highlights called numbers and displays a high-visibility verified-Bingo announcement above the grid when the room state includes a verified claim. `DrawHistory` presents every call newest first with its original draw position and an explicit empty state.
 
-## Draw history
+The board adapts from 15 columns on wide screens to denser phone layouts. On small screens, the caller display has a fixed-height row and draw history moves beneath the board.
 
-`GameRoomPage` shows a scrollable `DrawHistory` panel beside the number board. It presents all called numbers in reverse draw order, with the newest call first and its draw position displayed. The panel has an explicit empty state before the first number is called and uses the live `drawnNumbers` game state, so it updates with every WebSocket broadcast.
+## Admin panel
 
-## Bingo-call verification
+The caller UI provides:
 
-`AdminPanelPage` places a `Verify Bingo` button beneath the draw control. It opens a dialog with five separate, tab-navigable number fields for the claimed winning line. The dialog checks that the numbers are unique, fall within the active variant's range, and are all present in the live drawn-number state, then sends valid claims to the game service for authoritative verification. Once confirmed, the game room shows a high-visibility `BINGO!` announcement above the number board with the verified winning line. The announcement disappears when the next number is called, or when the game is reset or its variant changes.
+- An active-room selector, room-creation form, and link that opens the selected game room.
+- Five recent calls, newest first.
+- Variant selection, a random draw command, a validated manual-number form, and reset.
+- `Space` to draw and `R` to reset unless focus is in an input or select; `Escape` closes the Bingo dialog.
+- A five-field Bingo-verification dialog that reports wrong count, invalid/repeated values, and numbers not yet called before submitting a valid claim.
+- A dismissible service-error alert for failed caller actions.
+
+There is no sign-in or other authorization behavior at this time.
+
+## Theme and accessibility
+
+The default is a high-contrast light theme with white caller surfaces, dark text, slate borders, amber controls, and yellow drawn cells. The game-room theme button switches to dark mode and stores the choice in `localStorage` under `bingo-theme`. Core state is communicated visually without a sound dependency, and caller controls provide visible labels and keyboard access.
 
 ## Player cards
 
-`PlayerCardPage` generates stable 75-ball or 90-ball card sets. Its controls can change the card quantity, enter a card-set name, generate a replacement set, open the browser print flow, or download the displayed set as a multi-page A4 PDF with one card per page. A supplied card-set name is printed below each card grid without a per-card number.
-
-Run `npm run dev` and `npm run dev:ws` during local development.
+`PlayerCardPage` is independent of live game sessions. It generates 75-ball or 90-ball card sets with a selectable quantity (1, 2, 3, 4, 5, 6, 8, or 10), optional card-set name, browser print action, replacement-card action, and multi-page A4 PDF download. A supplied set name appears beneath every displayed card; generated cards do not show individual card numbers. Speedy Bingo cards are not available.

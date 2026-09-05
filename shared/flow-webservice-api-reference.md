@@ -1,46 +1,77 @@
 # Bingo Game API
 
-## Game sessions
+## Service model
 
-All endpoints use the shared WebSocket game service at `GAME_SERVER_WS_URL`. It defaults to `ws://localhost:3001` for local development; Docker Compose supplies `ws://ws-server:3001` for the internal container network. Each room has an isolated game session with a stable URL-safe ID and a human-readable `roomName`. Omitting `sessionId` selects the `default` room.
+The public HTTP API is `/api/game`. Its implementation communicates with the WebSocket game service at `GAME_SERVER_WS_URL`, which defaults to `ws://localhost:3001`; Docker Compose sets it to `ws://ws-server:3001` inside the container network. The game service holds room sessions in memory only.
 
-### `GET /api/game?sessionId=hall-a`
+All HTTP actions return `503` with `{ "error": "Game service is unavailable" }` when the service cannot be reached. Invalid input returns `400` with an `error` string.
 
-Returns the selected room's game session.
+`sessionId` is optional. Missing or invalid IDs resolve to `default`; valid IDs are lower-case, begin with a letter or digit, contain only letters, digits, and hyphens, and are at most 32 characters.
+
+## State shapes
 
 ```json
 {
   "gameState": {
-    "sessionId": "default",
+    "sessionId": "hall-a",
+    "roomName": "Main Hall",
     "variant": "90-ball",
-    "drawnNumbers": [],
-    "status": "waiting",
-    "verifiedBingo": null
+    "drawnNumbers": [12, 42],
+    "status": "in-play",
+    "verifiedBingo": { "claimedNumbers": [12, 24, 38, 42, 69] }
   }
 }
 ```
 
-### `GET /api/game?rooms=true`
-
-Returns summaries for all active rooms. The `default` room is always included.
+`variant` is `90-ball`, `75-ball`, or `speedy`; their maximum numbers are 90, 75, and 30 respectively. `status` is `waiting`, `in-play`, or `complete`. `verifiedBingo` is `null` until a valid claim is accepted.
 
 ```json
 {
-  "sessions": [{ "sessionId": "hall-a", "roomName": "Main Hall", "variant": "90-ball", "drawnCount": 12, "status": "in-play" }]
+  "sessions": [
+    { "sessionId": "hall-a", "roomName": "Main Hall", "variant": "90-ball", "drawnCount": 12, "status": "in-play" }
+  ]
 }
 ```
 
+## HTTP endpoints
+
+### `GET /api/game?sessionId=hall-a`
+
+Returns the selected room as `{ "gameState": GameState }`. The request creates the session if it does not yet exist.
+
+### `GET /api/game?rooms=true`
+
+Returns `{ "sessions": RoomSummary[] }`, sorted by room name. The default room is created and included when the directory is first requested.
+
 ### `POST /api/game`
 
-Accepts a JSON body with one of these actions:
+Send JSON with one of the following actions. A successful response is always `{ "gameState": GameState }`.
+
+| Request | Effect |
+|---|---|
+| `{ "action": "draw", "sessionId": "default" }` | Calls an available random number. Clears a verified Bingo. |
+| `{ "action": "call-number", "sessionId": "default", "number": 42 }` | Calls one uncalled integer in the active variant range. |
+| `{ "action": "create-session", "roomName": "Main Hall" }` | Creates a 90-ball room with a normalized display name and unique ID. |
+| `{ "action": "verify-bingo", "sessionId": "default", "claimedNumbers": [12, 24, 38, 54, 69] }` | Accepts exactly five unique, drawn numbers in range and sets `verifiedBingo`. |
+| `{ "action": "reset", "sessionId": "default" }` | Clears calls and sets the status to `waiting`, retaining the variant. |
+| `{ "action": "change-variant", "sessionId": "default", "variant": "75-ball" }` | Changes the variant, clears calls, and sets the status to `waiting`. |
+
+`call-number` rejects duplicates, non-integers, and numbers outside the active range. `verify-bingo` rejects all claims other than five unique, already-drawn numbers in that range. A new number, reset, or variant change clears a previously verified Bingo.
+
+## Browser WebSocket protocol
+
+Browsers connect to `NEXT_PUBLIC_WS_URL` when configured; otherwise they use the current page hostname on port `3001` and select `ws` or `wss` from the page protocol. After connecting, the client must subscribe:
 
 ```json
-{ "action": "draw", "sessionId": "default" }
-{ "action": "create-session", "roomName": "Main Hall" }
-{ "action": "call-number", "number": 42, "sessionId": "default" }
-{ "action": "verify-bingo", "claimedNumbers": [12, 24, 38, 54, 69], "sessionId": "default" }
-{ "action": "reset", "sessionId": "default" }
-{ "action": "change-variant", "variant": "75-ball", "sessionId": "default" }
+{ "action": "subscribe", "sessionId": "hall-a" }
 ```
 
-Each successful request returns the updated `gameState` for its `sessionId`. `call-number` accepts an uncalled whole number within the active variant's range. `verify-bingo` accepts exactly five unique, previously called numbers within the active variant's range; when accepted, `gameState.verifiedBingo` is broadcast only to clients subscribed to that room. Calling another number, resetting the game, or changing its variant clears the verified Bingo for that room. Invalid JSON, unsupported actions, unknown variants, duplicate numbers, invalid number ranges, and unverifiable Bingo claims return `400`; an unavailable game service returns `503`.
+The service immediately sends the room `GameState`, then sends each subsequent state update only to sockets subscribed to that room. The same service also understands these internal/protocol messages:
+
+| Message | Response |
+|---|---|
+| `{ "action": "list-sessions" }` | `{ "sessions": RoomSummary[] }` |
+| `{ "action": "ping", "sessionId": "hall-a" }` | Current `GameState` |
+| Any public game action above | Updated `GameState`, broadcast to subscribed room clients when accepted |
+
+Malformed WebSocket JSON is ignored. Unsupported or invalid direct WebSocket actions do not produce a structured error response; use the HTTP API for validated caller actions.

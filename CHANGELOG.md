@@ -16,10 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Printable player card generation
 - PDF download for generated print-ready player cards
 - Printable card-set name labels beneath each card grid
+- Room-specific game sessions with room creation and room selectors
+- Live draw history and caller-side recent-call display
+- Manual number calls and Bingo-claim verification
+- High-contrast light theme with persisted dark-theme option
+- Docker Compose deployment for the web app and WebSocket service
 
 ### Changed
 
-<!-- Existing changes -->
+- Reworked game state from a single session to in-memory, room-scoped WebSocket sessions.
 
 ### Deprecated
 
