@@ -101,9 +101,11 @@ body {
 
 .bingo-board {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(3.2rem, 1fr));
+  grid-template-columns: repeat(var(--board-columns), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--board-rows), minmax(2.5rem, 1fr));
   gap: clamp(0.35rem, 0.75vw, 0.75rem);
-  align-content: center;
+  container-type: inline-size;
+  height: 100%;
   min-height: 0;
   padding: clamp(0.75rem, 1.5vw, 1.5rem);
   background: var(--bingo-surface);
@@ -111,16 +113,19 @@ body {
   border-radius: 8px;
 }
 
+.bingo-board--90 { --board-columns: 15; --board-rows: 6; }
+.bingo-board--75 { --board-columns: 15; --board-rows: 5; }
+.bingo-board--speedy { --board-columns: 6; --board-rows: 5; }
+
 .bingo-board-cell {
   display: grid;
   place-items: center;
-  aspect-ratio: 1;
   min-width: 0;
   background: var(--bingo-undrawn);
   border: 2px solid #64748b;
   border-radius: 6px;
   color: var(--bingo-text);
-  font-size: clamp(1.3rem, 2.5vw, 2.75rem);
+  font-size: clamp(1rem, 2.5cqi, 2.25rem);
   font-weight: 800;
   line-height: 1;
 }
@@ -136,6 +141,16 @@ body {
   grid-template-columns: minmax(0, 1fr) minmax(13rem, 18rem);
   gap: clamp(0.75rem, 1.6vw, 1.5rem);
   min-height: 0;
+}
+
+@media (max-width: 1200px) {
+  .bingo-board--90 { --board-columns: 12; --board-rows: 8; }
+  .bingo-board--75 { --board-columns: 10; --board-rows: 8; }
+}
+
+@media (max-width: 900px) {
+  .bingo-board--90 { --board-columns: 8; --board-rows: 12; }
+  .bingo-board--75 { --board-columns: 8; --board-rows: 10; }
 }
 
 .draw-history {
@@ -205,10 +220,12 @@ body {
 }
 
 @media (max-width: 640px) {
-  .game-room { grid-template-rows: auto minmax(11rem, 0.8fr) minmax(18rem, 1.2fr); }
+  .game-room { grid-template-rows: auto 11rem auto; }
   .game-session-bar { grid-template-columns: 1fr; gap: 0.35rem; text-align: center; }
   .game-session-bar span:nth-child(2), .game-session-bar span:last-child { text-align: center; }
-  .bingo-board { grid-template-columns: repeat(auto-fit, minmax(2.45rem, 1fr)); }
+  .bingo-board--90 { --board-columns: 6; --board-rows: 15; }
+  .bingo-board--75 { --board-columns: 6; --board-rows: 13; }
+  .bingo-board--speedy { --board-columns: 4; --board-rows: 8; }
   .bingo-announcement { flex-direction: column; gap: 0.15rem; }
   .game-room-board-area { grid-template-columns: 1fr; grid-template-rows: minmax(18rem, 1fr) minmax(13rem, auto); }
   .draw-history { max-height: 17rem; }

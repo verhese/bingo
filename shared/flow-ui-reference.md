@@ -4,6 +4,10 @@
 
 `useGameSession` subscribes to the WebSocket game service for live state updates. `getWebSocketUrl` uses `NEXT_PUBLIC_WS_URL` when set; otherwise it connects to the current browser hostname on port `3001`, choosing `wss` for HTTPS pages. The admin panel uses `POST /api/game` to call a caller-entered number, draw a random number, verify a Bingo call, reset, and change the active variant; the game room rerenders from broadcast game state. Failures from these admin actions, including an unavailable game service, appear in a dismissible alert notification rather than as uncaught browser errors.
 
+## Responsive board
+
+`Board` applies a grid density tailored to its active variant and available space. Wide game-room displays use 15 columns for 90-ball and 75-ball boards; the layout reduces columns at tablet and phone breakpoints to retain readable cells. Each variant defines its grid rows as well as columns, so the board fills the available panel height without overflowing. Cell type scales to the board container rather than the viewport, and the phone game room reserves a stable caller-display height so the board follows directly below it without horizontal overflow.
+
 ## Draw history
 
 `GameRoomPage` shows a scrollable `DrawHistory` panel beside the number board. It presents all called numbers in reverse draw order, with the newest call first and its draw position displayed. The panel has an explicit empty state before the first number is called and uses the live `drawnNumbers` game state, so it updates with every WebSocket broadcast.

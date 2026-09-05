@@ -110,7 +110,7 @@ All core files are now implemented and functional:
 - [x] PDF export for print-ready cards
 - [x] "Bingo!" call verification UI in AdminPanel  
 - [x] Drawn-number history list (scrollable)
-- [ ] Board responsive cell sizing
+- [x] Board responsive cell sizing
 - [ ] Light mode
 - [ ] Multiple concurrent game sessions (run multiple rooms at the same time)
 - [x] Synology NAS Docker deployment (`Dockerfile`, `compose.yaml`, and deployment guide)
