@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGameSession } from '@/lib/useGameSession';
+import { RecentCalls } from '@/components/RecentCalls';
 import { VariantSelector } from '@/components/VariantSelector';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoClaim, type BingoClaimResult } from '@/lib/bingoClaim';
@@ -223,6 +224,7 @@ function AdminPanel() {
             <button type="submit" className="rounded-lg bg-bingo-accent px-5 py-3 text-lg font-bold text-bingo-bg hover:opacity-90">Create Room</button>
           </form>
         </section>
+        <RecentCalls drawnNumbers={state?.drawnNumbers ?? []} />
         <VariantSelector current={variant} onChange={handleVariantChange} />
         <form onSubmit={handleManualCall} className="flex flex-col gap-3">
           <label htmlFor="manual-number" className="font-bold text-bingo-text">
