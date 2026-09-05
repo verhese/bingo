@@ -75,6 +75,10 @@ All screens subscribe to the same game session via WebSocket. When the caller dr
 3. WebSocket broadcasts `{ drawnNumber, sessionId, variant }`
 4. All connected clients re-render instantly (SWR + SWR subscription or direct WS listener)
 
+### Planned Enhancements
+
+The current implementation uses one shared game session and the default dark, high-contrast theme. Future work will add a light-mode theme and support multiple concurrent sessions. Each session will need isolated game state and WebSocket broadcasts, allowing separate rooms to operate independently.
+
 ## Key Design Decisions
 
 | Decision | Rationale |

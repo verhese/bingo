@@ -2,7 +2,11 @@
 
 ## Game-session integration
 
-`useGameSession` subscribes to the WebSocket game service for live state updates. `getWebSocketUrl` uses `NEXT_PUBLIC_WS_URL` when set; otherwise it connects to the current browser hostname on port `3001`, choosing `wss` for HTTPS pages. The admin panel uses `POST /api/game` to call a caller-entered number, draw a random number, verify a Bingo call, reset, and change the active variant; the game room rerenders from broadcast game state.
+`useGameSession` subscribes to the WebSocket game service for live state updates. `getWebSocketUrl` uses `NEXT_PUBLIC_WS_URL` when set; otherwise it connects to the current browser hostname on port `3001`, choosing `wss` for HTTPS pages. The admin panel uses `POST /api/game` to call a caller-entered number, draw a random number, verify a Bingo call, reset, and change the active variant; the game room rerenders from broadcast game state. Failures from these admin actions, including an unavailable game service, appear in a dismissible alert notification rather than as uncaught browser errors.
+
+## Draw history
+
+`GameRoomPage` shows a scrollable `DrawHistory` panel beside the number board. It presents all called numbers in reverse draw order, with the newest call first and its draw position displayed. The panel has an explicit empty state before the first number is called and uses the live `drawnNumbers` game state, so it updates with every WebSocket broadcast.
 
 ## Bingo-call verification
 

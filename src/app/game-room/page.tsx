@@ -3,6 +3,7 @@
 import { useGameSession } from '@/lib/useGameSession';
 import { CallerDisplay } from '@/components/CallerDisplay';
 import { Board } from '@/components/Board';
+import { DrawHistory } from '@/components/DrawHistory';
 import { GameSessionBar } from '@/components/GameSessionBar';
 import type { GameVariant } from '@/types/game';
 import { VARIANTS } from '@/lib/variants';
@@ -23,11 +24,14 @@ export default function GameRoomPage() {
         status={state?.status ?? 'waiting'}
       />
       <CallerDisplay number={state?.drawnNumbers[state?.drawnNumbers.length - 1] ?? null} />
-      <Board
-        maxNumber={cfg.maxNumber}
-        drawnNumbers={state?.drawnNumbers ?? []}
-        verifiedBingo={state?.verifiedBingo?.claimedNumbers}
-      />
+      <div className="game-room-board-area">
+        <Board
+          maxNumber={cfg.maxNumber}
+          drawnNumbers={state?.drawnNumbers ?? []}
+          verifiedBingo={state?.verifiedBingo?.claimedNumbers}
+        />
+        <DrawHistory drawnNumbers={state?.drawnNumbers ?? []} />
+      </div>
     </main>
   );
 }

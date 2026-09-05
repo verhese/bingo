@@ -110,6 +110,11 @@ The Compose file configures `GAME_SERVER_WS_URL=ws://ws-server:3001` internally.
 - **Printable cards** — Generate player cards for each game
 - **Accessibility-first** — High contrast, large fonts, no reliance on sound
 
+## Planned Enhancements
+
+- **Light mode** — An alternate high-contrast visual theme.
+- **Concurrent rooms** — Independently managed game sessions so multiple rooms can run at the same time.
+
 ## Architecture
 
 See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for system design details.

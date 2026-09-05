@@ -131,6 +131,74 @@ body {
   color: #111827;
 }
 
+.game-room-board-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(13rem, 18rem);
+  gap: clamp(0.75rem, 1.6vw, 1.5rem);
+  min-height: 0;
+}
+
+.draw-history {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  padding: 1rem;
+  background: var(--bingo-surface);
+  border: 2px solid #475569;
+  border-radius: 8px;
+}
+
+.draw-history-title {
+  margin: 0 0 0.75rem;
+  color: var(--bingo-text);
+  font-size: clamp(1.1rem, 1.8vw, 1.5rem);
+  font-weight: 800;
+}
+
+.draw-history-list {
+  display: grid;
+  grid-auto-rows: min-content;
+  gap: 0.5rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0 0.25rem 0 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.draw-history-item {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  align-items: center;
+  min-height: 3.25rem;
+  background: var(--bingo-bg);
+  border: 1px solid #64748b;
+  border-radius: 6px;
+}
+
+.draw-history-order {
+  color: var(--bingo-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.draw-history-number {
+  color: var(--bingo-accent);
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+}
+
+.draw-history-empty {
+  align-self: center;
+  margin: 0;
+  color: var(--bingo-muted);
+  font-weight: 700;
+  text-align: center;
+}
+
 @media (max-height: 760px) {
   .game-room { grid-template-rows: auto minmax(10rem, 0.9fr) minmax(15rem, 1.1fr); }
   .caller-value { font-size: clamp(6rem, 23vh, 14rem); }
@@ -142,6 +210,8 @@ body {
   .game-session-bar span:nth-child(2), .game-session-bar span:last-child { text-align: center; }
   .bingo-board { grid-template-columns: repeat(auto-fit, minmax(2.45rem, 1fr)); }
   .bingo-announcement { flex-direction: column; gap: 0.15rem; }
+  .game-room-board-area { grid-template-columns: 1fr; grid-template-rows: minmax(18rem, 1fr) minmax(13rem, auto); }
+  .draw-history { max-height: 17rem; }
 }
 
 @media print { html { font-size: 12pt; } }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import { useGameSession } from '@/lib/useGameSession';
 import { VariantSelector } from '@/components/VariantSelector';
 import { VARIANTS } from '@/lib/variants';
@@ -19,22 +19,54 @@ export default function AdminPanelPage() {
   const [claimResult, setClaimResult] = useState<BingoClaimResult | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
+  const [serviceError, setServiceError] = useState<string | null>(null);
   const { drawNumber, callNumber, state } = useGameSession(WS_URL);
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
 
   const handleVariantChange = async (newVariant: GameVariant) => {
-    const response = await fetch('/api/game', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'change-variant', variant: newVariant }),
-    });
+    setServiceError(null);
+    try {
+      const response = await fetch('/api/game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'change-variant', variant: newVariant }),
+      });
 
-    if (!response.ok) {
-      const result = (await response.json()) as { error?: string };
-      throw new Error(result.error ?? 'Unable to change the game variant');
+      if (!response.ok) {
+        const result = (await response.json()) as { error?: string };
+        throw new Error(result.error ?? 'Unable to change the game variant');
+      }
+
+      setVariant(newVariant);
+    } catch (variantError) {
+      setServiceError(variantError instanceof Error ? variantError.message : 'Unable to change the game variant');
     }
+  };
 
-    setVariant(newVariant);
+  const handleDrawNumber = async () => {
+    setServiceError(null);
+    try {
+      await drawNumber();
+    } catch (drawError) {
+      setServiceError(drawError instanceof Error ? drawError.message : 'Unable to draw a number');
+    }
+  };
+
+  const handleReset = async () => {
+    setServiceError(null);
+    try {
+      const response = await fetch('/api/game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset', sessionId: state?.sessionId }),
+      });
+      if (!response.ok) {
+        const result = (await response.json()) as { error?: string };
+        throw new Error(result.error ?? 'Unable to reset the game');
+      }
+    } catch (resetError) {
+      setServiceError(resetError instanceof Error ? resetError.message : 'Unable to reset the game');
+    }
   };
 
   const handleManualCall = async (event: React.SyntheticEvent<HTMLFormElement>) => {
@@ -44,7 +76,9 @@ export default function AdminPanelPage() {
       await callNumber(Number(manualNumber));
       setManualNumber('');
     } catch (callError) {
-      setError(callError instanceof Error ? callError.message : 'Unable to call that number');
+      const message = callError instanceof Error ? callError.message : 'Unable to call that number';
+      setError(message);
+      setServiceError(message);
     }
   };
 
@@ -69,8 +103,10 @@ export default function AdminPanelPage() {
       }
       setClaimResult(verification);
     } catch (verificationError) {
+      const message = verificationError instanceof Error ? verificationError.message : 'Unable to verify the Bingo call';
       setClaimResult(null);
-      setClaimError(verificationError instanceof Error ? verificationError.message : 'Unable to verify the Bingo call');
+      setClaimError(message);
+      setServiceError(message);
     }
   };
 
@@ -86,16 +122,11 @@ export default function AdminPanelPage() {
 
     if (e.code === 'Space') {
       e.preventDefault(); // Prevent page scroll
-      drawNumber();
+      void handleDrawNumber();
     } else if (e.key === 'r' || e.key === 'R') {
-      // Reset game
-      fetch('/api/game', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reset' }),
-      }).then(() => alert('Game reset!'));
+      void handleReset();
     }
-  }, [drawNumber, isVerifyDialogOpen]);
+  }, [handleDrawNumber, handleReset, isVerifyDialogOpen]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -104,6 +135,21 @@ export default function AdminPanelPage() {
 
   return (
     <div className="flex h-screen w-screen flex-col items-center justify-center bg-bingo-bg p-8 text-2xl">
+      {serviceError && (
+        <div role="alert" className="fixed right-4 top-4 z-50 flex max-w-md items-start gap-3 rounded-lg border-2 border-red-300 bg-bingo-surface p-4 text-lg text-bingo-text shadow-2xl">
+          <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-red-300" aria-hidden="true" />
+          <p className="font-bold">{serviceError}</p>
+          <button
+            type="button"
+            onClick={() => setServiceError(null)}
+            title="Dismiss notification"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-white/30 text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+            <span className="sr-only">Dismiss notification</span>
+          </button>
+        </div>
+      )}
       <h1 className="mb-8 heading-lg font-bold text-bingo-text">Admin Panel</h1>
       <div className="flex flex-col gap-6">
         <VariantSelector current={variant} onChange={handleVariantChange} />
@@ -134,7 +180,7 @@ export default function AdminPanelPage() {
         </form>
         <button
           type="button"
-          onClick={drawNumber}
+          onClick={handleDrawNumber}
           className="rounded-xl bg-bingo-accent px-8 py-4 text-3xl font-bold text-bingo-bg hover:opacity-90"
         >
           Draw Number
@@ -148,13 +194,7 @@ export default function AdminPanelPage() {
         </button>
         <button
           type="button"
-          onClick={() => {
-            fetch('/api/game', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'reset' }),
-            }).then(() => alert('Game reset!'));
-          }}
+          onClick={handleReset}
           className="rounded-xl border-2 border-white/30 px-6 py-2 text-lg text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
         >
           Reset Game
