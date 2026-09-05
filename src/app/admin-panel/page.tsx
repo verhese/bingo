@@ -136,14 +136,14 @@ export default function AdminPanelPage() {
   return (
     <div className="flex h-screen w-screen flex-col items-center justify-center bg-bingo-bg p-8 text-2xl">
       {serviceError && (
-        <div role="alert" className="fixed right-4 top-4 z-50 flex max-w-md items-start gap-3 rounded-lg border-2 border-red-300 bg-bingo-surface p-4 text-lg text-bingo-text shadow-2xl">
-          <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-red-300" aria-hidden="true" />
+        <div role="alert" className="fixed right-4 top-4 z-50 flex max-w-md items-start gap-3 rounded-lg border-2 border-bingo-danger bg-bingo-surface p-4 text-lg text-bingo-text shadow-2xl">
+          <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-bingo-danger" aria-hidden="true" />
           <p className="font-bold">{serviceError}</p>
           <button
             type="button"
             onClick={() => setServiceError(null)}
             title="Dismiss notification"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-white/30 text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-bingo-muted text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
           >
             <X className="h-5 w-5" aria-hidden="true" />
             <span className="sr-only">Dismiss notification</span>
@@ -166,7 +166,7 @@ export default function AdminPanelPage() {
               step="1"
               value={manualNumber}
               onChange={(event) => setManualNumber(event.target.value)}
-              className="w-40 rounded border-2 border-white/30 bg-bingo-surface px-4 py-3 text-3xl font-bold text-bingo-text"
+              className="w-40 rounded border-2 border-bingo-muted bg-bingo-surface px-4 py-3 text-3xl font-bold text-bingo-text"
               required
             />
             <button
@@ -176,7 +176,7 @@ export default function AdminPanelPage() {
               Call Number
             </button>
           </div>
-          {error && <p role="alert" className="text-lg font-bold text-red-300">{error}</p>}
+          {error && <p role="alert" className="text-lg font-bold text-bingo-danger">{error}</p>}
         </form>
         <button
           type="button"
@@ -195,7 +195,7 @@ export default function AdminPanelPage() {
         <button
           type="button"
           onClick={handleReset}
-          className="rounded-xl border-2 border-white/30 px-6 py-2 text-lg text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
+          className="rounded-xl border-2 border-bingo-muted px-6 py-2 text-lg text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
         >
           Reset Game
         </button>
@@ -211,7 +211,7 @@ export default function AdminPanelPage() {
             aria-modal="true"
             aria-labelledby="verify-bingo-title"
             aria-describedby="verify-bingo-description"
-            className="w-full max-w-2xl rounded-lg border-2 border-white/30 bg-bingo-surface p-6 shadow-2xl"
+            className="w-full max-w-2xl rounded-lg border-2 border-bingo-muted bg-bingo-surface p-6 shadow-2xl"
           >
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
@@ -222,7 +222,7 @@ export default function AdminPanelPage() {
                 type="button"
                 onClick={() => setIsVerifyDialogOpen(false)}
                 title="Close verification dialog"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border-2 border-white/30 text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border-2 border-bingo-muted text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
               >
                 <X className="h-6 w-6" aria-hidden="true" />
                 <span className="sr-only">Close</span>
@@ -250,7 +250,7 @@ export default function AdminPanelPage() {
                         setClaimError(null);
                       }}
                       aria-label={`Winning line number ${index + 1}`}
-                      className="min-w-0 rounded-lg border-2 border-white/30 bg-bingo-bg px-2 py-3 text-center text-xl font-bold text-bingo-text"
+                      className="min-w-0 rounded-lg border-2 border-bingo-muted bg-bingo-bg px-2 py-3 text-center text-xl font-bold text-bingo-text"
                       required
                     />
                   ))}
@@ -260,7 +260,7 @@ export default function AdminPanelPage() {
                 <button
                   type="button"
                   onClick={() => setIsVerifyDialogOpen(false)}
-                  className="rounded-lg border-2 border-white/30 px-6 py-3 text-xl font-bold text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
+                  className="rounded-lg border-2 border-bingo-muted px-6 py-3 text-xl font-bold text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
                 >
                   Cancel
                 </button>
@@ -274,13 +274,13 @@ export default function AdminPanelPage() {
               {claimResult && (
                 <div
                   role="status"
-                  className={claimResult.isVerified ? 'border-l-4 border-bingo-success bg-bingo-success/15 p-3 text-bingo-text' : 'border-l-4 border-red-300 bg-red-300/10 p-3 text-bingo-text'}
+                  className={claimResult.isVerified ? 'border-l-4 border-bingo-success bg-bingo-success/15 p-3 text-bingo-text' : 'border-l-4 border-bingo-danger bg-bingo-danger/10 p-3 text-bingo-text'}
                 >
                   {claimResult.isVerified ? (
                     <p className="font-bold text-bingo-success">Bingo verified. Every number in this line has been called.</p>
                   ) : (
                     <div className="space-y-1">
-                      <p className="font-bold text-red-300">This call cannot be verified yet.</p>
+                      <p className="font-bold text-bingo-danger">This call cannot be verified yet.</p>
                       {claimResult.claimedNumbers.length !== 5 && <p>Enter exactly five numbers from one winning line.</p>}
                       {claimResult.invalidNumbers.length > 0 && <p>Invalid or repeated numbers: {claimResult.invalidNumbers.join(', ')}.</p>}
                       {claimResult.missingNumbers.length > 0 && <p>Not called: {claimResult.missingNumbers.join(', ')}.</p>}
@@ -288,7 +288,7 @@ export default function AdminPanelPage() {
                   )}
                 </div>
               )}
-              {claimError && <p role="alert" className="font-bold text-red-300">{claimError}</p>}
+              {claimError && <p role="alert" className="font-bold text-bingo-danger">{claimError}</p>}
             </form>
           </div>
         </div>

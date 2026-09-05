@@ -1,3 +1,5 @@
+import { ThemeToggle } from '@/components/ThemeToggle';
+
 interface GameSessionBarProps {
   readonly variant: string;
   readonly drawnCount: number;
@@ -10,6 +12,7 @@ export function GameSessionBar({ variant, drawnCount, status }: GameSessionBarPr
       <span>Variant: {variant}</span>
       <span>Drawn: {drawnCount}</span>
       <span className="text-bingo-accent capitalize">{status}</span>
+      <ThemeToggle />
     </header>
   );
 }

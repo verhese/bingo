@@ -157,7 +157,7 @@ export default function PlayerCardPage() {
         <select
           value={variant}
           onChange={(e) => setVariant(e.target.value as GameVariant)}
-          className="rounded border border-white/20 bg-bingo-bg px-4 py-2 text-xl text-white"
+          className="rounded border border-bingo-muted bg-bingo-bg px-4 py-2 text-xl text-bingo-text"
         >
           <option value="90-ball">90-ball</option>
           <option value="75-ball">75-ball</option>
@@ -166,7 +166,7 @@ export default function PlayerCardPage() {
         <select
           value={cardCount}
           onChange={(e) => handleCardCountChange(Number(e.target.value))}
-          className="rounded border border-white/20 bg-bingo-bg px-4 py-2 text-xl text-white"
+          className="rounded border border-bingo-muted bg-bingo-bg px-4 py-2 text-xl text-bingo-text"
         >
           {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
             <option key={n} value={n}>{n} card{n > 1 ? 's' : ''}</option>
@@ -181,14 +181,14 @@ export default function PlayerCardPage() {
           onChange={(e) => setCardSetName(e.target.value)}
           placeholder="Card set name"
           maxLength={40}
-          className="w-52 rounded border border-white/20 bg-bingo-bg px-4 py-2 text-xl text-white placeholder:text-bingo-muted"
+          className="w-52 rounded border border-bingo-muted bg-bingo-bg px-4 py-2 text-xl text-bingo-text placeholder:text-bingo-muted"
         />
 
         <button
           type="button"
           onClick={handleNewCards}
           title="Generate new cards"
-          className="flex h-11 w-11 items-center justify-center rounded border border-white/20 bg-bingo-bg text-white hover:bg-white/10"
+          className="flex h-11 w-11 items-center justify-center rounded border border-bingo-muted bg-bingo-bg text-bingo-text hover:bg-bingo-undrawn"
         >
           <RefreshCw className="h-5 w-5" />
           <span className="sr-only">Generate new cards</span>

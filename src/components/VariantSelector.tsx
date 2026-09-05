@@ -10,7 +10,7 @@ interface VariantSelectorProps {
 export function VariantSelector({ current, onChange, locked }: VariantSelectorProps) {
   return (
     <select
-      className="rounded border border-white/20 bg-bingo-surface px-4 py-2 text-xl text-bingo-text"
+      className="rounded border border-bingo-muted bg-bingo-surface px-4 py-2 text-xl text-bingo-text"
       value={current}
       disabled={locked}
       onChange={(e) => onChange(e.target.value as GameVariant)}

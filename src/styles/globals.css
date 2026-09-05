@@ -1,6 +1,22 @@
 @import "tailwindcss";
 
 :root {
+  --bingo-bg: #ffffff;
+  --bingo-surface: #eef2f6;
+  --bingo-accent: #7a4a00;
+  --bingo-success: #137333;
+  --bingo-muted: #334155;
+  --bingo-text: #111827;
+  --bingo-undrawn: #dbe4ed;
+  --bingo-border: #475569;
+  --bingo-caller-bg: #ffffff;
+  --bingo-caller-value: #111827;
+  --bingo-drawn: #facc15;
+  --bingo-drawn-border: #713f12;
+  --bingo-danger: #b91c1c;
+}
+
+:root[data-theme='dark'] {
   --bingo-bg: #101827;
   --bingo-surface: #1e293b;
   --bingo-accent: #ffd23f;
@@ -8,6 +24,12 @@
   --bingo-muted: #cbd5e1;
   --bingo-text: #f8fafc;
   --bingo-undrawn: #334155;
+  --bingo-border: #64748b;
+  --bingo-caller-bg: #172033;
+  --bingo-caller-value: #ffd23f;
+  --bingo-drawn: #ffd23f;
+  --bingo-drawn-border: #fff1a8;
+  --bingo-danger: #fca5a5;
 }
 
 @theme {
@@ -18,6 +40,7 @@
   --color-bingo-muted: var(--bingo-muted);
   --color-bingo-text: var(--bingo-text);
   --color-bingo-undrawn: var(--bingo-undrawn);
+  --color-bingo-danger: var(--bingo-danger);
 }
 
 html { font-size: 18px; }
@@ -40,7 +63,7 @@ body {
 
 .game-session-bar {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   gap: 1rem;
   align-items: center;
   padding: 1rem 1.5rem;
@@ -52,19 +75,19 @@ body {
 }
 
 .game-session-bar span:nth-child(2) { text-align: center; }
-.game-session-bar span:last-child { color: var(--bingo-accent); text-align: right; }
+.game-session-bar span:nth-child(3) { color: var(--bingo-accent); text-align: right; }
 
 .caller-display {
   display: grid;
   place-items: center;
   min-height: 0;
-  background: #172033;
+  background: var(--bingo-caller-bg);
   border: 4px solid var(--bingo-accent);
   border-radius: 8px;
 }
 
 .caller-value {
-  color: var(--bingo-accent);
+  color: var(--bingo-caller-value);
   font-size: clamp(8rem, 27vh, 20rem);
   font-weight: 800;
   letter-spacing: 0;
@@ -131,9 +154,32 @@ body {
 }
 
 .bingo-board-cell.is-drawn {
-  background: var(--bingo-accent);
-  border-color: #fff1a8;
+  background: var(--bingo-drawn);
+  border-color: var(--bingo-drawn-border);
   color: #111827;
+}
+
+.theme-toggle {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  padding: 0;
+  background: var(--bingo-surface);
+  border: 2px solid var(--bingo-border);
+  border-radius: 6px;
+  color: var(--bingo-text);
+  box-shadow: 0 2px 8px rgb(15 23 42 / 25%);
+}
+
+.theme-toggle:hover {
+  border-color: var(--bingo-accent);
+  color: var(--bingo-accent);
+}
+
+.theme-toggle:focus-visible {
+  outline: 3px solid var(--bingo-accent);
+  outline-offset: 3px;
 }
 
 .game-room-board-area {
@@ -222,7 +268,8 @@ body {
 @media (max-width: 640px) {
   .game-room { grid-template-rows: auto 11rem auto; }
   .game-session-bar { grid-template-columns: 1fr; gap: 0.35rem; text-align: center; }
-  .game-session-bar span:nth-child(2), .game-session-bar span:last-child { text-align: center; }
+  .game-session-bar span:nth-child(2), .game-session-bar span:nth-child(3) { text-align: center; }
+  .theme-toggle { justify-self: center; }
   .bingo-board--90 { --board-columns: 6; --board-rows: 15; }
   .bingo-board--75 { --board-columns: 6; --board-rows: 13; }
   .bingo-board--speedy { --board-columns: 4; --board-rows: 8; }
