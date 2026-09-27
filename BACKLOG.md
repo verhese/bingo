@@ -31,6 +31,28 @@
 
 ## Remaining work
 
+### Draw-mode lock (from test run 2026-09-27)
+
+- [ ] Lock the draw mode (manual vs auto) after the first draw of a session. Currently `ws-server.ts` handles `draw` (auto) and `call-number` (manual) independently with no mode tracking, so the caller can accidentally mix them. Once the first draw is made, all subsequent draws must use the same mode; the other mode's UI controls should be disabled/hidden.
+  - Server: add a `drawMode: 'manual' | 'auto' | null` field to `GameState`; set it on the first `draw` or `call-number` action; reject the other action with a clear error if the mode is already locked.
+  - Admin panel: disable the auto-draw button (and `Space` shortcut) when mode is `manual`, and disable the manual-call form when mode is `auto`. Show a small indicator of the locked mode.
+
+### Undo last call (from test run 2026-09-27)
+
+- [ ] Add the ability to remove the most recently drawn/called number. Currently there is no `undo` action in `ws-server.ts` and no undo button in the admin panel. A wrongly entered number is currently permanent until a full reset.
+  - Server: add an `undo-last-draw` action that pops the last entry from `drawnNumbers` (only valid when `status === 'in-play'` and `drawnNumbers.length > 0`). Track undone numbers in a new `undoneNumbers: number[]` field on `GameState` so the board can display them. Clear an entry from `undoneNumbers` when that number is subsequently drawn again.
+  - Admin panel: add a **very prominent** "Undo Last Call" button (large, high-contrast, e.g. red/amber) near the draw controls. It should be immediately visible without scrolling. Consider a confirmation step or a brief "last call was X — undo?" inline prompt so the caller acknowledges the action.
+  - Game board: numbers in `undoneNumbers` must be rendered with a **red cross** overlay (e.g. a large ✕ or strikethrough) so all players can see at a glance that the number was called in error. The red cross persists until the number is drawn again, at which point it is removed from `undoneNumbers` and the cell returns to its normal drawn state.
+
+### Default variant to 75-ball (from test run 2026-09-27)
+
+- [ ] Change the default game variant from `90-ball` to `75-ball`. The game is almost always played as 75-ball.
+  - `src/server/ws-server.ts`: `createNewGame` default parameter and `getOrCreateSession` / `createSession` all default to `'90-ball'` — change to `'75-ball'`.
+  - `src/app/admin-panel/page.tsx`: initial `useState<GameVariant>('90-ball')` → `'75-ball'`.
+  - `src/lib/variants.ts`: reorder `VARIANTS` so `75-ball` is listed first (affects any UI that iterates the record).
+
+### Other
+
 - [ ] Add automated unit, integration, and end-to-end tests. No test scripts currently exist in `package.json`.
 - [ ] Complete an accessibility audit, including screen-reader and keyboard-only manual testing.
 - [ ] Add durable session storage for rooms and calls. Sessions are currently in memory only.
