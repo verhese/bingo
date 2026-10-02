@@ -16,6 +16,7 @@ All HTTP actions return `503` with `{ "error": "Game service is unavailable" }` 
     "sessionId": "hall-a",
     "roomName": "Main Hall",
     "variant": "90-ball",
+    "drawMode": "auto",
     "drawnNumbers": [12, 42],
     "status": "in-play",
     "verifiedBingo": { "claimedNumbers": [12, 24, 38, 42, 69] }
@@ -24,6 +25,7 @@ All HTTP actions return `503` with `{ "error": "Game service is unavailable" }` 
 ```
 
 `variant` is `90-ball`, `75-ball`, or `speedy`; their maximum numbers are 90, 75, and 30 respectively. `status` is `waiting`, `in-play`, or `complete`. `verifiedBingo` is `null` until a valid claim is accepted.
+`drawMode` is `null` before the first accepted call, then `auto` for random draws or `manual` for caller-entered numbers. Reset and variant changes clear the mode.
 
 ```json
 {
@@ -49,14 +51,14 @@ Send JSON with one of the following actions. A successful response is always `{ 
 
 | Request | Effect |
 |---|---|
-| `{ "action": "draw", "sessionId": "default" }` | Calls an available random number. Clears a verified Bingo. |
-| `{ "action": "call-number", "sessionId": "default", "number": 42 }` | Calls one uncalled integer in the active variant range. |
-| `{ "action": "create-session", "roomName": "Main Hall" }` | Creates a 90-ball room with a normalized display name and unique ID. |
+| `{ "action": "draw", "sessionId": "default" }` | Calls an available random number. Locks the game to automatic drawing on its first accepted call and clears a verified Bingo. |
+| `{ "action": "call-number", "sessionId": "default", "number": 42 }` | Calls one uncalled integer in the active variant range. Locks the game to manual calls on its first accepted call. |
+| `{ "action": "create-session", "roomName": "Main Hall" }` | Creates a 75-ball room with a normalized display name and unique ID. |
 | `{ "action": "verify-bingo", "sessionId": "default", "claimedNumbers": [12, 24, 38, 54, 69] }` | Accepts exactly five unique, drawn numbers in range and sets `verifiedBingo`. |
-| `{ "action": "reset", "sessionId": "default" }` | Clears calls and sets the status to `waiting`, retaining the variant. |
-| `{ "action": "change-variant", "sessionId": "default", "variant": "75-ball" }` | Changes the variant, clears calls, and sets the status to `waiting`. |
+| `{ "action": "reset", "sessionId": "default" }` | Clears calls and draw mode and sets the status to `waiting`, retaining the variant. |
+| `{ "action": "change-variant", "sessionId": "default", "variant": "75-ball" }` | Changes the variant, clears calls and draw mode, and sets the status to `waiting`. |
 
-`call-number` rejects duplicates, non-integers, and numbers outside the active range. `verify-bingo` rejects all claims other than five unique, already-drawn numbers in that range. A new number, reset, or variant change clears a previously verified Bingo.
+`call-number` rejects duplicates, non-integers, and numbers outside the active range. Switching between automatic and manual calls after the first accepted call returns `409` with an `error` string; reset or variant change unlocks the game. `verify-bingo` rejects all claims other than five unique, already-drawn numbers in that range. A new number, reset, or variant change clears a previously verified Bingo.
 
 ## Browser WebSocket protocol
 
@@ -74,4 +76,4 @@ The service immediately sends the room `GameState`, then sends each subsequent s
 | `{ "action": "ping", "sessionId": "hall-a" }` | Current `GameState` |
 | Any public game action above | Updated `GameState`, broadcast to subscribed room clients when accepted |
 
-Malformed WebSocket JSON is ignored. Unsupported or invalid direct WebSocket actions do not produce a structured error response; use the HTTP API for validated caller actions.
+Malformed WebSocket JSON is ignored. A draw-mode conflict returns `{ "error": "..." }` to the requesting socket and is not broadcast. Other unsupported or invalid direct WebSocket actions do not produce a structured error response; use the HTTP API for validated caller actions.

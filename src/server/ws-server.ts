@@ -10,6 +10,8 @@ interface GameSession {
   allNumbers: number[];
 }
 
+type GameActionResult = GameState | { error: string } | null;
+
 // In-memory game state store (sessionId → session data)
 const gameSessions = new Map<string, GameSession>();
 
@@ -24,6 +26,7 @@ function createNewGame(
     sessionId,
     roomName,
     variant,
+    drawMode: null,
     drawnNumbers: [],
     status: 'waiting',
     verifiedBingo: null,
@@ -92,17 +95,25 @@ function broadcastSessionState(gameState: GameState, sender: WebSocket) {
 
 function handleGameAction(
   parsed: { action: string; sessionId?: string; roomName?: string; variant?: GameVariant; number?: number; claimedNumbers?: number[] },
-): GameState | null {
+): GameActionResult {
   if (parsed.action === 'create-session') return createSession(parsed.roomName);
 
   const session = getOrCreateSession(parsed.sessionId);
   const sessionData = gameSessions.get(session.sessionId);
   if (!sessionData) return null;
 
+  if (parsed.action === 'draw' && session.drawMode === 'manual') {
+    return { error: 'Draw mode is locked to manual calls. Reset the game to switch to automatic drawing.' };
+  }
+  if (parsed.action === 'call-number' && session.drawMode === 'auto') {
+    return { error: 'Draw mode is locked to automatic drawing. Reset the game to switch to manual calls.' };
+  }
+
   if (parsed.action === 'draw') {
     if (session.status === 'waiting') session.status = 'in-play';
     const nextNum = getNextNumber(sessionData.allNumbers, session.drawnNumbers);
     if (nextNum !== null) {
+      session.drawMode ??= 'auto';
       session.drawnNumbers.push(nextNum);
       session.verifiedBingo = null;
     }
@@ -112,6 +123,7 @@ function handleGameAction(
 
   if (parsed.action === 'call-number' && typeof parsed.number === 'number') {
     if (session.status === 'waiting') session.status = 'in-play';
+    session.drawMode ??= 'manual';
     session.drawnNumbers.push(parsed.number);
     session.verifiedBingo = null;
     return { ...session };
@@ -142,6 +154,8 @@ function handleGameAction(
     session.variant = parsed.variant;
     session.drawnNumbers = [];
     session.status = 'waiting';
+    session.drawMode = null;
+    session.verifiedBingo = null;
     gameSessions.set(session.sessionId, {
       gameState: session,
       allNumbers: generateAllNumbers(VARIANTS[parsed.variant].maxNumber),
@@ -187,12 +201,16 @@ wss.on('connection', (ws: WebSocket) => {
       return;
     }
 
-    const broadcastState = handleGameAction(parsed);
+    const actionResult = handleGameAction(parsed);
 
-    if (broadcastState) {
-      ws.send(JSON.stringify(broadcastState));
-      broadcastSessionState(broadcastState, ws);
+    if (!actionResult) return;
+    if ('error' in actionResult) {
+      ws.send(JSON.stringify(actionResult));
+      return;
     }
+
+    ws.send(JSON.stringify(actionResult));
+    broadcastSessionState(actionResult, ws);
   });
 
   ws.on('close', () => {

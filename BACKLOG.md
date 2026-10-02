@@ -33,9 +33,7 @@
 
 ### Draw-mode lock (from test run 2026-09-27)
 
-- [ ] Lock the draw mode (manual vs auto) after the first draw of a session. Currently `ws-server.ts` handles `draw` (auto) and `call-number` (manual) independently with no mode tracking, so the caller can accidentally mix them. Once the first draw is made, all subsequent draws must use the same mode; the other mode's UI controls should be disabled/hidden.
-  - Server: add a `drawMode: 'manual' | 'auto' | null` field to `GameState`; set it on the first `draw` or `call-number` action; reject the other action with a clear error if the mode is already locked.
-  - Admin panel: disable the auto-draw button (and `Space` shortcut) when mode is `manual`, and disable the manual-call form when mode is `auto`. Show a small indicator of the locked mode.
+- [x] Lock the draw mode (manual vs auto) after the first call of a session. The server rejects the other action with a clear error; the admin panel disables incompatible controls and shows the locked mode. Reset and variant changes clear the lock.
 
 ### Undo last call (from test run 2026-09-27)
 
