@@ -29,6 +29,7 @@ function createNewGame(
     drawMode: null,
     drawnNumbers: [],
     undoneNumbers: [],
+    lastUndoneNumber: null,
     status: 'waiting',
     verifiedBingo: null,
   };
@@ -94,6 +95,25 @@ function broadcastSessionState(gameState: GameState, sender: WebSocket) {
   });
 }
 
+function undoLastDraw(session: GameState, expectedNumber?: number): GameActionResult {
+  if (session.drawMode !== 'manual') {
+    return { error: 'Undo is only available for manual calls.' };
+  }
+  if (session.status !== 'in-play' || session.drawnNumbers.length === 0) {
+    return { error: 'There is no call to undo.' };
+  }
+
+  const lastNumber = session.drawnNumbers.at(-1)!;
+  if (expectedNumber !== undefined && expectedNumber !== lastNumber) {
+    return { error: 'The latest call changed. Review the current call before undoing.' };
+  }
+  session.drawnNumbers.pop();
+  if (!session.undoneNumbers.includes(lastNumber)) session.undoneNumbers.push(lastNumber);
+  session.lastUndoneNumber = lastNumber;
+  session.verifiedBingo = null;
+  return { ...session };
+}
+
 function handleGameAction(
   parsed: { action: string; sessionId?: string; roomName?: string; variant?: GameVariant; number?: number; claimedNumbers?: number[] },
 ): GameActionResult {
@@ -102,6 +122,8 @@ function handleGameAction(
   const session = getOrCreateSession(parsed.sessionId);
   const sessionData = gameSessions.get(session.sessionId);
   if (!sessionData) return null;
+
+  if (parsed.action === 'undo-last-draw') return undoLastDraw(session, parsed.number);
 
   if (parsed.action === 'draw' && session.drawMode === 'manual') {
     return { error: 'Draw mode is locked to manual calls. Reset the game to switch to automatic drawing.' };
@@ -117,6 +139,7 @@ function handleGameAction(
       session.drawMode ??= 'auto';
       session.drawnNumbers.push(nextNum);
       session.undoneNumbers = session.undoneNumbers.filter((number) => number !== nextNum);
+      session.lastUndoneNumber = null;
       session.verifiedBingo = null;
     }
     else session.status = 'complete';
@@ -128,20 +151,7 @@ function handleGameAction(
     session.drawMode ??= 'manual';
     session.drawnNumbers.push(parsed.number);
     session.undoneNumbers = session.undoneNumbers.filter((number) => number !== parsed.number);
-    session.verifiedBingo = null;
-    return { ...session };
-  }
-
-  if (parsed.action === 'undo-last-draw') {
-    if (session.status !== 'in-play' || session.drawnNumbers.length === 0) {
-      return { error: 'There is no call to undo.' };
-    }
-    const lastNumber = session.drawnNumbers.at(-1)!;
-    if (parsed.number !== undefined && parsed.number !== lastNumber) {
-      return { error: 'The latest call changed. Review the current call before undoing.' };
-    }
-    session.drawnNumbers.pop();
-    if (!session.undoneNumbers.includes(lastNumber)) session.undoneNumbers.push(lastNumber);
+    session.lastUndoneNumber = null;
     session.verifiedBingo = null;
     return { ...session };
   }
@@ -171,6 +181,7 @@ function handleGameAction(
     session.variant = parsed.variant;
     session.drawnNumbers = [];
     session.undoneNumbers = [];
+    session.lastUndoneNumber = null;
     session.status = 'waiting';
     session.drawMode = null;
     session.verifiedBingo = null;

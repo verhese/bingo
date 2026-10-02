@@ -11,6 +11,9 @@
   --bingo-border: #475569;
   --bingo-caller-bg: #ffffff;
   --bingo-caller-value: #111827;
+  --bingo-caller-undone-bg: #fee2e2;
+  --bingo-caller-undone-text: #7f1d1d;
+  --bingo-caller-undone-label-bg: #b91c1c;
   --bingo-drawn: #facc15;
   --bingo-drawn-border: #713f12;
   --bingo-danger: #b91c1c;
@@ -27,6 +30,9 @@
   --bingo-border: #64748b;
   --bingo-caller-bg: #172033;
   --bingo-caller-value: #ffd23f;
+  --bingo-caller-undone-bg: #450a0a;
+  --bingo-caller-undone-text: #fecaca;
+  --bingo-caller-undone-label-bg: #991b1b;
   --bingo-drawn: #ffd23f;
   --bingo-drawn-border: #fff1a8;
   --bingo-danger: #fca5a5;
@@ -113,6 +119,32 @@ body {
   letter-spacing: 0;
   line-height: 0.82;
   text-shadow: 0 4px 0 #000;
+}
+
+.caller-display--undone {
+  grid-template-rows: auto 1fr;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bingo-caller-undone-bg);
+  border-color: var(--bingo-danger);
+}
+
+.caller-undone-label {
+  padding: 0.4rem 1rem;
+  background: var(--bingo-caller-undone-label-bg);
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: clamp(1rem, 2.5vh, 1.75rem);
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.caller-value--undone {
+  color: var(--bingo-caller-undone-text);
+  text-decoration: line-through;
+  text-decoration-thickness: 0.08em;
+  text-shadow: none;
 }
 
 .bingo-board-section {

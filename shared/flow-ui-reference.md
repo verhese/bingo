@@ -8,7 +8,7 @@ The game room and admin panel both show the active room as a query parameter. Th
 
 ## Game room
 
-`GameRoomPage` renders `GameSessionBar`, `CallerDisplay`, `Board`, and `DrawHistory` for the selected room. The session bar shows room, variant, number count, status, and an icon-only theme control. `CallerDisplay` displays the latest called number or an em dash before the first call, using a polite ARIA live region.
+`GameRoomPage` renders `GameSessionBar`, `CallerDisplay`, `Board`, and `DrawHistory` for the selected room. The session bar shows room, variant, number count, status, and an icon-only theme control. `CallerDisplay` displays the latest called number or an em dash before the first call. After undo, it keeps the undone number visible with a distinct red treatment until the next call, using a polite ARIA live region.
 
 `Board` is a single component with layouts for 90-ball, 75-ball, and Speedy Bingo. It highlights called numbers and displays a high-visibility verified-Bingo announcement above the grid when the room state includes a verified claim. `DrawHistory` presents every call newest first with its original draw position and an explicit empty state.
 
@@ -21,7 +21,7 @@ The caller UI provides:
 - An active-room selector, room-creation form, and link that opens the selected game room.
 - Five recent calls, newest first.
 - Variant selection, a random draw command, a validated manual-number form, and reset.
-- A prominent Undo Last Call control with an inline confirmation naming the latest call. Undo removes that call from history and the caller display, while the game board marks the number with a red X until it is called again.
+- A red Undo Last Call control beside Call Number in manual mode, with an inline confirmation naming the latest call. Undo removes that call from history and the caller display, while the game board marks the number with a red X until it is called again.
 - The first accepted call locks the room to automatic or manual drawing; the opposing control and automatic-draw `Space` shortcut are disabled until reset or variant change. The locked mode is shown in the caller panel.
 - `Space` to draw and `R` to reset unless focus is in an input or select; `Escape` closes the Bingo dialog.
 - A five-field Bingo-verification dialog that reports wrong count, invalid/repeated values, and numbers not yet called before submitting a valid claim.

@@ -23,6 +23,8 @@ function GameRoom() {
   const { state } = useGameSession(WS_URL, roomId);
   const variant = (state?.variant as GameVariant) ?? '75-ball';
   const cfg = VARIANTS[variant];
+  const lastUndoneNumber = state?.lastUndoneNumber ?? null;
+  const callerNumber = lastUndoneNumber ?? state?.drawnNumbers.at(-1) ?? null;
 
   useEffect(() => {
     let isCurrent = true;
@@ -63,7 +65,7 @@ function GameRoom() {
         drawnCount={state?.drawnNumbers.length ?? 0}
         status={state?.status ?? 'waiting'}
       />
-      <CallerDisplay number={state?.drawnNumbers[state?.drawnNumbers.length - 1] ?? null} />
+      <CallerDisplay number={callerNumber} isUndone={lastUndoneNumber !== null} />
       <div className="game-room-board-area">
         <Board
           maxNumber={cfg.maxNumber}

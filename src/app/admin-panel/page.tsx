@@ -35,7 +35,7 @@ function AdminPanel() {
   const autoDrawLocked = drawMode === 'manual';
   const manualCallLocked = drawMode === 'auto';
   const lastCall = state?.drawnNumbers.at(-1);
-  const canUndo = state?.status === 'in-play' && lastCall !== undefined;
+  const canUndo = drawMode === 'manual' && state?.status === 'in-play' && lastCall !== undefined;
 
   useEffect(() => {
     setUndoConfirmation(false);
@@ -56,6 +56,10 @@ function AdminPanel() {
   useEffect(() => {
     if (state) setVariant(state.variant);
   }, [state]);
+
+  useEffect(() => {
+    if (drawMode !== 'manual') setUndoConfirmation(false);
+  }, [drawMode]);
 
   const handleCreateRoom = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -226,36 +230,6 @@ function AdminPanel() {
       )}
       <h1 className="mb-8 heading-lg font-bold text-bingo-text">Admin Panel</h1>
       <div className="flex flex-col gap-6">
-        <button
-          type="button"
-          onClick={handleDrawNumber}
-          disabled={autoDrawLocked}
-          className="rounded-xl bg-bingo-accent px-8 py-4 text-3xl font-bold text-bingo-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Draw Number
-        </button>
-        {undoConfirmation ? (
-          <fieldset className="flex flex-wrap items-center gap-3 rounded-lg border-2 border-red-700 bg-red-50 p-4 text-lg font-bold text-red-900">
-            <legend className="sr-only">Confirm undo last call</legend>
-            <span>Undo call {lastCall}?</span>
-            <button type="button" onClick={handleUndoLastCall} disabled={!canUndo} className="rounded-md bg-red-700 px-5 py-3 text-xl font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50">
-              Undo Call
-            </button>
-            <button type="button" onClick={() => setUndoConfirmation(false)} className="rounded-md border-2 border-red-700 px-5 py-3 text-xl font-bold text-red-900 hover:bg-red-100">
-              Keep Call
-            </button>
-          </fieldset>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setUndoConfirmation(true)}
-            disabled={!canUndo}
-            className="flex items-center justify-center gap-3 rounded-xl border-4 border-red-800 bg-red-700 px-8 py-4 text-3xl font-extrabold text-white shadow-lg hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <RotateCcw className="h-8 w-8" aria-hidden="true" />
-            Undo Last Call{lastCall === undefined ? '' : ` (${lastCall})`}
-          </button>
-        )}
         <section className="flex flex-col gap-3">
           <label htmlFor="room-id" className="font-bold text-bingo-text">Active room</label>
           <div className="flex flex-wrap items-center gap-3">
@@ -295,7 +269,7 @@ function AdminPanel() {
           <label htmlFor="manual-number" className="font-bold text-bingo-text">
             Call a specific number (1-{maxNumber})
           </label>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <input
               id="manual-number"
               type="number"
@@ -315,9 +289,41 @@ function AdminPanel() {
             >
               Call Number
             </button>
+            {drawMode === 'manual' && (
+              undoConfirmation ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-lg font-bold text-bingo-text">Undo {lastCall}?</span>
+                  <button type="button" onClick={handleUndoLastCall} disabled={!canUndo} className="flex items-center gap-2 rounded-xl border-2 border-red-700 bg-red-700 px-6 py-3 text-xl font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50">
+                    <RotateCcw className="h-5 w-5" aria-hidden="true" />
+                    Undo Call
+                  </button>
+                  <button type="button" onClick={() => setUndoConfirmation(false)} className="rounded-xl border-2 border-bingo-muted px-6 py-3 text-xl font-bold text-bingo-text hover:bg-bingo-surface">
+                    Keep Call
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setUndoConfirmation(true)}
+                  disabled={!canUndo}
+                  className="flex items-center gap-2 rounded-xl border-2 border-red-700 px-6 py-3 text-xl font-bold text-red-700 hover:bg-red-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RotateCcw className="h-5 w-5" aria-hidden="true" />
+                  Undo Last Call
+                </button>
+              )
+            )}
           </div>
           {error && <p role="alert" className="text-lg font-bold text-bingo-danger">{error}</p>}
         </form>
+        <button
+          type="button"
+          onClick={handleDrawNumber}
+          disabled={autoDrawLocked}
+          className="rounded-xl bg-bingo-accent px-8 py-4 text-3xl font-bold text-bingo-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Draw Number
+        </button>
         <button
           type="button"
           onClick={() => setIsVerifyDialogOpen(true)}
