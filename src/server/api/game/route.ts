@@ -7,8 +7,14 @@ import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 
 const WS_URL = process.env.GAME_SERVER_WS_URL || 'ws://localhost:3001';
 
-function parseGameState(data: RawData): GameState {
-  return JSON.parse(parseResponseText(data)) as GameState;
+class GameActionRejectedError extends Error {}
+
+function parseGameResponse(data: RawData): GameState {
+  const response = JSON.parse(parseResponseText(data)) as GameState | { error?: unknown };
+  if ('error' in response && typeof response.error === 'string') {
+    throw new GameActionRejectedError(response.error);
+  }
+  return response as GameState;
 }
 
 function parseResponseText(data: RawData): string {
@@ -38,9 +44,14 @@ function requestGameState(
 
     socket.once('open', () => socket.send(JSON.stringify(message)));
     socket.on('message', (data) => {
-      const gameState = parseGameState(data);
-      socket.close();
-      resolve(gameState);
+      try {
+        const gameState = parseGameResponse(data);
+        socket.close();
+        resolve(gameState);
+      } catch (error) {
+        socket.close();
+        reject(error);
+      }
     });
     socket.once('error', (error) => {
       socket.close();
@@ -131,7 +142,10 @@ export async function POST(req: NextRequest) {
 
     const gameState = await requestGameState({ action, sessionId, roomName, variant, number, claimedNumbers });
     return NextResponse.json({ gameState });
-  } catch {
+  } catch (error) {
+    if (error instanceof GameActionRejectedError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Game service is unavailable' }, { status: 503 });
   }
 }

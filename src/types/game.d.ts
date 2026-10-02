@@ -2,6 +2,7 @@ export interface GameState {
   sessionId: string;
   roomName: string;
   variant: GameVariant;
+  drawMode: 'manual' | 'auto' | null;
   drawnNumbers: number[];
   status: 'waiting' | 'in-play' | 'complete';
   verifiedBingo: VerifiedBingo | null;

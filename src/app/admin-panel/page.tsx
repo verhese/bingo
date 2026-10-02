@@ -30,6 +30,9 @@ function AdminPanel() {
   const [serviceError, setServiceError] = useState<string | null>(null);
   const { drawNumber, callNumber, state } = useGameSession(WS_URL, roomId);
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
+  const drawMode = state?.drawMode ?? null;
+  const autoDrawLocked = drawMode === 'manual';
+  const manualCallLocked = drawMode === 'auto';
 
   useEffect(() => {
     setVariant('75-ball');
@@ -98,6 +101,7 @@ function AdminPanel() {
   };
 
   const handleDrawNumber = async () => {
+    if (autoDrawLocked) return;
     setServiceError(null);
     try {
       await drawNumber();
@@ -125,6 +129,7 @@ function AdminPanel() {
 
   const handleManualCall = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (manualCallLocked) return;
     setError(null);
     try {
       await callNumber(Number(manualNumber));
@@ -176,11 +181,11 @@ function AdminPanel() {
 
     if (e.code === 'Space') {
       e.preventDefault(); // Prevent page scroll
-      void handleDrawNumber();
+      if (!autoDrawLocked) void handleDrawNumber();
     } else if (e.key === 'r' || e.key === 'R') {
       void handleReset();
     }
-  }, [handleDrawNumber, handleReset, isVerifyDialogOpen]);
+  }, [autoDrawLocked, handleDrawNumber, handleReset, isVerifyDialogOpen]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -235,6 +240,11 @@ function AdminPanel() {
           </form>
         </section>
         <RecentCalls drawnNumbers={state?.drawnNumbers ?? []} />
+        {drawMode && (
+          <output className="text-sm font-bold text-bingo-accent">
+            Draw mode locked: {drawMode === 'auto' ? 'automatic' : 'manual'}.
+          </output>
+        )}
         <VariantSelector current={variant} onChange={handleVariantChange} />
         <form onSubmit={handleManualCall} className="flex flex-col gap-3">
           <label htmlFor="manual-number" className="font-bold text-bingo-text">
@@ -248,13 +258,15 @@ function AdminPanel() {
               max={maxNumber}
               step="1"
               value={manualNumber}
+              disabled={manualCallLocked}
               onChange={(event) => setManualNumber(event.target.value)}
-              className="w-40 rounded border-2 border-bingo-muted bg-bingo-surface px-4 py-3 text-3xl font-bold text-bingo-text"
+              className="w-40 rounded border-2 border-bingo-muted bg-bingo-surface px-4 py-3 text-3xl font-bold text-bingo-text disabled:cursor-not-allowed disabled:opacity-50"
               required
             />
             <button
               type="submit"
-              className="rounded-xl border-2 border-bingo-accent px-6 py-3 text-xl font-bold text-bingo-accent hover:bg-bingo-accent hover:text-bingo-bg"
+              disabled={manualCallLocked}
+              className="rounded-xl border-2 border-bingo-accent px-6 py-3 text-xl font-bold text-bingo-accent hover:bg-bingo-accent hover:text-bingo-bg disabled:cursor-not-allowed disabled:opacity-50"
             >
               Call Number
             </button>
@@ -264,7 +276,8 @@ function AdminPanel() {
         <button
           type="button"
           onClick={handleDrawNumber}
-          className="rounded-xl bg-bingo-accent px-8 py-4 text-3xl font-bold text-bingo-bg hover:opacity-90"
+          disabled={autoDrawLocked}
+          className="rounded-xl bg-bingo-accent px-8 py-4 text-3xl font-bold text-bingo-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Draw Number
         </button>
