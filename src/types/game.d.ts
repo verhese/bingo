@@ -4,6 +4,8 @@ export interface GameState {
   variant: GameVariant;
   drawMode: 'manual' | 'auto' | null;
   drawnNumbers: number[];
+  undoneNumbers: number[];
+  lastUndoneNumber: number | null;
   status: 'waiting' | 'in-play' | 'complete';
   verifiedBingo: VerifiedBingo | null;
 }

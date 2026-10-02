@@ -51,8 +51,12 @@ export function useGameSession(url: string, sessionId = DEFAULT_ROOM_ID) {
     return performGameAction('call-number', number);
   };
 
+  const undoLastCall = async (number: number) => {
+    return performGameAction('undo-last-draw', number);
+  };
+
   const performGameAction = async (
-    action: 'draw' | 'call-number',
+    action: 'draw' | 'call-number' | 'undo-last-draw',
     number?: number,
   ) => {
     const response = await fetch('/api/game', {
@@ -71,5 +75,5 @@ export function useGameSession(url: string, sessionId = DEFAULT_ROOM_ID) {
   };
 
   const activeState = state?.sessionId === sessionId ? state : null;
-  return { state: activeState, connected, drawNumber, callNumber };
+  return { state: activeState, connected, drawNumber, callNumber, undoLastCall };
 }

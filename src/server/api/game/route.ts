@@ -31,7 +31,7 @@ function parseResponseText(data: RawData): string {
 
 function requestGameState(
   message: {
-    action: 'create-session' | 'draw' | 'call-number' | 'reset' | 'change-variant' | 'verify-bingo' | 'ping';
+    action: 'create-session' | 'draw' | 'call-number' | 'undo-last-draw' | 'reset' | 'change-variant' | 'verify-bingo' | 'ping';
     sessionId?: string;
     roomName?: string;
     variant?: GameVariant;
@@ -84,7 +84,7 @@ function requestSessions(): Promise<RoomSummary[]> {
 // POST /api/game — Handles draw and reset actions
 export async function POST(req: NextRequest) {
   let body: {
-    action: 'create-session' | 'draw' | 'call-number' | 'reset' | 'change-variant' | 'verify-bingo';
+    action: 'create-session' | 'draw' | 'call-number' | 'undo-last-draw' | 'reset' | 'change-variant' | 'verify-bingo';
     sessionId?: string;
     roomName?: string;
     variant?: GameVariant;
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
   const { action, roomName, variant, number, claimedNumbers } = body;
   const sessionId = normalizeRoomId(body.sessionId);
 
-  if (!['create-session', 'draw', 'call-number', 'reset', 'change-variant', 'verify-bingo'].includes(action)) {
+  if (!['create-session', 'draw', 'call-number', 'undo-last-draw', 'reset', 'change-variant', 'verify-bingo'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
   if (action === 'change-variant' && (!variant || !VARIANTS[variant])) {

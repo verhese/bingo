@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, RotateCcw, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGameSession } from '@/lib/useGameSession';
 import { RecentCalls } from '@/components/RecentCalls';
@@ -27,14 +27,18 @@ function AdminPanel() {
   const [claimResult, setClaimResult] = useState<BingoClaimResult | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
+  const [undoConfirmation, setUndoConfirmation] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
-  const { drawNumber, callNumber, state } = useGameSession(WS_URL, roomId);
+  const { drawNumber, callNumber, undoLastCall, state } = useGameSession(WS_URL, roomId);
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
   const drawMode = state?.drawMode ?? null;
   const autoDrawLocked = drawMode === 'manual';
   const manualCallLocked = drawMode === 'auto';
+  const lastCall = state?.drawnNumbers.at(-1);
+  const canUndo = drawMode === 'manual' && state?.status === 'in-play' && lastCall !== undefined;
 
   useEffect(() => {
+    setUndoConfirmation(false);
     setVariant('75-ball');
     const loadRooms = async () => {
       try {
@@ -52,6 +56,10 @@ function AdminPanel() {
   useEffect(() => {
     if (state) setVariant(state.variant);
   }, [state]);
+
+  useEffect(() => {
+    if (drawMode !== 'manual') setUndoConfirmation(false);
+  }, [drawMode]);
 
   const handleCreateRoom = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -124,6 +132,17 @@ function AdminPanel() {
       }
     } catch (resetError) {
       setServiceError(resetError instanceof Error ? resetError.message : 'Unable to reset the game');
+    }
+  };
+
+  const handleUndoLastCall = async () => {
+    if (!canUndo || lastCall === undefined) return;
+    setServiceError(null);
+    try {
+      await undoLastCall(lastCall);
+      setUndoConfirmation(false);
+    } catch (undoError) {
+      setServiceError(undoError instanceof Error ? undoError.message : 'Unable to undo the last call');
     }
   };
 
@@ -250,7 +269,7 @@ function AdminPanel() {
           <label htmlFor="manual-number" className="font-bold text-bingo-text">
             Call a specific number (1-{maxNumber})
           </label>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <input
               id="manual-number"
               type="number"
@@ -270,6 +289,30 @@ function AdminPanel() {
             >
               Call Number
             </button>
+            {drawMode === 'manual' && (
+              undoConfirmation ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-lg font-bold text-bingo-text">Undo {lastCall}?</span>
+                  <button type="button" onClick={handleUndoLastCall} disabled={!canUndo} className="flex items-center gap-2 rounded-xl border-2 border-red-700 bg-red-700 px-6 py-3 text-xl font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50">
+                    <RotateCcw className="h-5 w-5" aria-hidden="true" />
+                    Undo Call
+                  </button>
+                  <button type="button" onClick={() => setUndoConfirmation(false)} className="rounded-xl border-2 border-bingo-muted px-6 py-3 text-xl font-bold text-bingo-text hover:bg-bingo-surface">
+                    Keep Call
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setUndoConfirmation(true)}
+                  disabled={!canUndo}
+                  className="flex items-center gap-2 rounded-xl border-2 border-red-700 px-6 py-3 text-xl font-bold text-red-700 hover:bg-red-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RotateCcw className="h-5 w-5" aria-hidden="true" />
+                  Undo Last Call
+                </button>
+              )
+            )}
           </div>
           {error && <p role="alert" className="text-lg font-bold text-bingo-danger">{error}</p>}
         </form>
