@@ -6,7 +6,8 @@
 	],
 	"settings": {
 		"chat.tools.terminal.autoApprove": {
-			"npx tsc": true
+			"npx tsc": true,
+			"gh": true
 		}
 	}
 }
