@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect, useCallback } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, RotateCcw, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGameSession } from '@/lib/useGameSession';
 import { RecentCalls } from '@/components/RecentCalls';
@@ -27,14 +27,18 @@ function AdminPanel() {
   const [claimResult, setClaimResult] = useState<BingoClaimResult | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
+  const [undoConfirmation, setUndoConfirmation] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
-  const { drawNumber, callNumber, state } = useGameSession(WS_URL, roomId);
+  const { drawNumber, callNumber, undoLastCall, state } = useGameSession(WS_URL, roomId);
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
   const drawMode = state?.drawMode ?? null;
   const autoDrawLocked = drawMode === 'manual';
   const manualCallLocked = drawMode === 'auto';
+  const lastCall = state?.drawnNumbers.at(-1);
+  const canUndo = state?.status === 'in-play' && lastCall !== undefined;
 
   useEffect(() => {
+    setUndoConfirmation(false);
     setVariant('75-ball');
     const loadRooms = async () => {
       try {
@@ -127,6 +131,17 @@ function AdminPanel() {
     }
   };
 
+  const handleUndoLastCall = async () => {
+    if (!canUndo || lastCall === undefined) return;
+    setServiceError(null);
+    try {
+      await undoLastCall(lastCall);
+      setUndoConfirmation(false);
+    } catch (undoError) {
+      setServiceError(undoError instanceof Error ? undoError.message : 'Unable to undo the last call');
+    }
+  };
+
   const handleManualCall = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (manualCallLocked) return;
@@ -211,6 +226,36 @@ function AdminPanel() {
       )}
       <h1 className="mb-8 heading-lg font-bold text-bingo-text">Admin Panel</h1>
       <div className="flex flex-col gap-6">
+        <button
+          type="button"
+          onClick={handleDrawNumber}
+          disabled={autoDrawLocked}
+          className="rounded-xl bg-bingo-accent px-8 py-4 text-3xl font-bold text-bingo-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Draw Number
+        </button>
+        {undoConfirmation ? (
+          <fieldset className="flex flex-wrap items-center gap-3 rounded-lg border-2 border-red-700 bg-red-50 p-4 text-lg font-bold text-red-900">
+            <legend className="sr-only">Confirm undo last call</legend>
+            <span>Undo call {lastCall}?</span>
+            <button type="button" onClick={handleUndoLastCall} disabled={!canUndo} className="rounded-md bg-red-700 px-5 py-3 text-xl font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50">
+              Undo Call
+            </button>
+            <button type="button" onClick={() => setUndoConfirmation(false)} className="rounded-md border-2 border-red-700 px-5 py-3 text-xl font-bold text-red-900 hover:bg-red-100">
+              Keep Call
+            </button>
+          </fieldset>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setUndoConfirmation(true)}
+            disabled={!canUndo}
+            className="flex items-center justify-center gap-3 rounded-xl border-4 border-red-800 bg-red-700 px-8 py-4 text-3xl font-extrabold text-white shadow-lg hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RotateCcw className="h-8 w-8" aria-hidden="true" />
+            Undo Last Call{lastCall === undefined ? '' : ` (${lastCall})`}
+          </button>
+        )}
         <section className="flex flex-col gap-3">
           <label htmlFor="room-id" className="font-bold text-bingo-text">Active room</label>
           <div className="flex flex-wrap items-center gap-3">
@@ -273,14 +318,6 @@ function AdminPanel() {
           </div>
           {error && <p role="alert" className="text-lg font-bold text-bingo-danger">{error}</p>}
         </form>
-        <button
-          type="button"
-          onClick={handleDrawNumber}
-          disabled={autoDrawLocked}
-          className="rounded-xl bg-bingo-accent px-8 py-4 text-3xl font-bold text-bingo-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Draw Number
-        </button>
         <button
           type="button"
           onClick={() => setIsVerifyDialogOpen(true)}

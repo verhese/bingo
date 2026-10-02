@@ -28,6 +28,7 @@ function createNewGame(
     variant,
     drawMode: null,
     drawnNumbers: [],
+    undoneNumbers: [],
     status: 'waiting',
     verifiedBingo: null,
   };
@@ -115,6 +116,7 @@ function handleGameAction(
     if (nextNum !== null) {
       session.drawMode ??= 'auto';
       session.drawnNumbers.push(nextNum);
+      session.undoneNumbers = session.undoneNumbers.filter((number) => number !== nextNum);
       session.verifiedBingo = null;
     }
     else session.status = 'complete';
@@ -125,6 +127,21 @@ function handleGameAction(
     if (session.status === 'waiting') session.status = 'in-play';
     session.drawMode ??= 'manual';
     session.drawnNumbers.push(parsed.number);
+    session.undoneNumbers = session.undoneNumbers.filter((number) => number !== parsed.number);
+    session.verifiedBingo = null;
+    return { ...session };
+  }
+
+  if (parsed.action === 'undo-last-draw') {
+    if (session.status !== 'in-play' || session.drawnNumbers.length === 0) {
+      return { error: 'There is no call to undo.' };
+    }
+    const lastNumber = session.drawnNumbers.at(-1)!;
+    if (parsed.number !== undefined && parsed.number !== lastNumber) {
+      return { error: 'The latest call changed. Review the current call before undoing.' };
+    }
+    session.drawnNumbers.pop();
+    if (!session.undoneNumbers.includes(lastNumber)) session.undoneNumbers.push(lastNumber);
     session.verifiedBingo = null;
     return { ...session };
   }
@@ -153,6 +170,7 @@ function handleGameAction(
   if (parsed.action === 'change-variant' && parsed.variant && VARIANTS[parsed.variant]) {
     session.variant = parsed.variant;
     session.drawnNumbers = [];
+    session.undoneNumbers = [];
     session.status = 'waiting';
     session.drawMode = null;
     session.verifiedBingo = null;

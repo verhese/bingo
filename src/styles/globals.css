@@ -161,6 +161,7 @@ body {
 .bingo-board--speedy { --board-columns: 6; --board-rows: 5; }
 
 .bingo-board-cell {
+  position: relative;
   display: grid;
   place-items: center;
   min-width: 0;
@@ -177,6 +178,22 @@ body {
   background: var(--bingo-drawn);
   border-color: var(--bingo-drawn-border);
   color: #111827;
+}
+
+.bingo-board-cell.is-undone {
+  background: #fee2e2;
+  border-color: #b91c1c;
+  color: #7f1d1d;
+}
+
+.bingo-board-cell.is-undone::after {
+  position: absolute;
+  color: #b91c1c;
+  content: "X";
+  font-size: 1.55em;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 0 #ffffff;
 }
 
 .theme-toggle {

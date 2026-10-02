@@ -68,6 +68,7 @@ function GameRoom() {
         <Board
           maxNumber={cfg.maxNumber}
           drawnNumbers={state?.drawnNumbers ?? []}
+          undoneNumbers={state?.undoneNumbers ?? []}
           verifiedBingo={state?.verifiedBingo?.claimedNumbers}
         />
         <DrawHistory drawnNumbers={state?.drawnNumbers ?? []} />
