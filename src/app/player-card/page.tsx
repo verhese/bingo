@@ -76,7 +76,7 @@ function CardGrid90({ cards, cardSetName }: { readonly cards: Card90[]; cardSetN
 }
 
 export default function PlayerCardPage() {
-  const [variant, setVariant] = useState<GameVariant>('90-ball');
+  const [variant, setVariant] = useState<GameVariant>('75-ball');
   const [cardCount, setCardCount] = useState(6);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState('');

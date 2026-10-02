@@ -46,10 +46,9 @@
 
 ### Default variant to 75-ball (from test run 2026-09-27)
 
-- [ ] Change the default game variant from `90-ball` to `75-ball`. The game is almost always played as 75-ball.
-  - `src/server/ws-server.ts`: `createNewGame` default parameter and `getOrCreateSession` / `createSession` all default to `'90-ball'` — change to `'75-ball'`.
-  - `src/app/admin-panel/page.tsx`: initial `useState<GameVariant>('90-ball')` → `'75-ball'`.
-  - `src/lib/variants.ts`: reorder `VARIANTS` so `75-ball` is listed first (affects any UI that iterates the record).
+- [x] Change the default game variant from `90-ball` to `75-ball`. The game is almost always played as 75-ball.
+  - Server-created sessions, admin and game-room fallbacks, and player-card selection default to `'75-ball'`.
+  - `src/lib/variants.ts` lists `75-ball` first for UI that iterates the record.
 
 ### Other
 

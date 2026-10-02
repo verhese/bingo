@@ -21,7 +21,7 @@ function GameRoom() {
   const roomId = normalizeRoomId(searchParams.get('room'));
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const { state } = useGameSession(WS_URL, roomId);
-  const variant = (state?.variant as GameVariant) ?? '90-ball';
+  const variant = (state?.variant as GameVariant) ?? '75-ball';
   const cfg = VARIANTS[variant];
 
   useEffect(() => {
