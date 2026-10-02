@@ -18,7 +18,7 @@ function AdminPanel() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const roomId = normalizeRoomId(searchParams.get('room'));
-  const [variant, setVariant] = useState<GameVariant>('90-ball');
+  const [variant, setVariant] = useState<GameVariant>('75-ball');
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [newRoomName, setNewRoomName] = useState('');
   const [manualNumber, setManualNumber] = useState('');
@@ -32,7 +32,7 @@ function AdminPanel() {
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
 
   useEffect(() => {
-    setVariant('90-ball');
+    setVariant('75-ball');
     const loadRooms = async () => {
       try {
         const response = await fetch('/api/game?rooms=true');

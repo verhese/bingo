@@ -14,7 +14,7 @@ interface GameSession {
 const gameSessions = new Map<string, GameSession>();
 
 function createNewGame(
-  variant: GameVariant = '90-ball',
+  variant: GameVariant = '75-ball',
   sessionId = DEFAULT_ROOM_ID,
   roomName = sessionId,
 ): GameState {
@@ -35,7 +35,7 @@ function getOrCreateSession(sessionId?: string): GameState {
   if (gameSessions.has(normalizedSessionId)) {
     return gameSessions.get(normalizedSessionId)!.gameState;
   }
-  const newGame = createNewGame('90-ball', normalizedSessionId, normalizedSessionId);
+  const newGame = createNewGame('75-ball', normalizedSessionId, normalizedSessionId);
   gameSessions.set(newGame.sessionId, {
     gameState: newGame,
     allNumbers: generateAllNumbers(VARIANTS[newGame.variant].maxNumber),
@@ -52,7 +52,7 @@ function createSession(roomName?: string): GameState {
     sessionId = `${baseId}-${suffix}`;
     suffix += 1;
   }
-  const gameState = createNewGame('90-ball', sessionId, normalizedRoomName);
+  const gameState = createNewGame('75-ball', sessionId, normalizedRoomName);
   gameSessions.set(sessionId, {
     gameState,
     allNumbers: generateAllNumbers(VARIANTS[gameState.variant].maxNumber),
