@@ -241,9 +241,9 @@ function AdminPanel() {
         </section>
         <RecentCalls drawnNumbers={state?.drawnNumbers ?? []} />
         {drawMode && (
-          <p role="status" className="text-sm font-bold text-bingo-accent">
+          <output className="text-sm font-bold text-bingo-accent">
             Draw mode locked: {drawMode === 'auto' ? 'automatic' : 'manual'}.
-          </p>
+          </output>
         )}
         <VariantSelector current={variant} onChange={handleVariantChange} />
         <form onSubmit={handleManualCall} className="flex flex-col gap-3">
