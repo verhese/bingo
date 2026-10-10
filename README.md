@@ -24,7 +24,7 @@ When creating a room, you can also define a custom mode by selecting patterns an
 
 ## Requirements
 
-- Node.js 18 or later
+- Node.js 20.9 or later
 - npm
 
 ## Local development
@@ -56,8 +56,13 @@ Use the same `room` value in the game room and admin URLs to share a session, fo
 | `npm run start` | Start the production Next.js server. |
 | `npm run start:ws` | Start the WebSocket game service. |
 | `npm run lint` | Run ESLint across the project. |
+| `npm test` | Run unit and integration tests. |
+| `npm run test:unit` | Run unit tests for pure game rules and utilities (`src/**/*.test.ts`). |
+| `npm run test:integration` | Start a throwaway WebSocket game server on a free port and test its actions and the `/api/game` handlers (`tests/integration`). |
+| `npm run test:e2e` | Run Playwright browser tests against isolated servers on ports 3100/3101 (`tests/e2e`). |
+| `npm run test:all` | Run every test suite. |
 
-Run `npm test` to execute the Bingo-claim and game-mode unit tests.
+Before the first end-to-end run, install the browser with `npx playwright install chromium`. The test suites start their own servers and keep no state, so they can run while the development servers are running. CI runs them in `.github/workflows/tests.yml`.
 
 ## Docker deployment
 
