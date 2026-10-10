@@ -9,7 +9,7 @@
     "start": "next start -H 0.0.0.0",
     "start:ws": "tsx src/server/ws-server.ts",
     "lint": "eslint .",
-    "test": "tsx --test src/lib/bingoClaim.test.ts"
+    "test": "tsx --test src/lib/bingoClaim.test.ts src/lib/gameModes.test.ts"
   },
   "dependencies": {
     "@tailwindcss/forms": "^0.5.9",
