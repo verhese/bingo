@@ -2,7 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { VARIANTS } from '@/lib/variants';
 import { generateAllNumbers, getNextNumber } from '@/lib/bingoNumbers';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
-import { BUILT_IN_GAME_MODES, advanceGameModeStage, createCustomGameMode, getActiveStage, getGameModeStages } from '@/lib/gameModes';
+import { BUILT_IN_GAME_MODES, DEFAULT_GAME_MODE_ID, advanceGameModeStage, createCustomGameMode, getActiveStage, getGameModeStages } from '@/lib/gameModes';
 import { DEFAULT_ROOM_ID, normalizeRoomId, normalizeRoomName } from '@/lib/gameRoom';
 import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 
@@ -20,21 +20,22 @@ function createNewGame(
   variant: GameVariant = '75-ball',
   sessionId = DEFAULT_ROOM_ID,
   roomName = sessionId,
-  gameModeId = BUILT_IN_GAME_MODES[0].id,
+  gameModeId = DEFAULT_GAME_MODE_ID,
   customGameModes: GameState['customGameModes'] = [],
 ): GameState {
   const cfg = VARIANTS[variant];
   if (!cfg) throw new Error(`Unknown variant: ${variant}`);
-  const stage = getActiveStage(gameModeId, 0, customGameModes) ?? 'single-row';
+  const effectiveGameModeId = variant === '75-ball' ? gameModeId : '';
+  const stage = getActiveStage(effectiveGameModeId, 0, customGameModes) ?? 'single-row';
   return {
     sessionId,
     roomName,
     variant,
-    gameModeId,
+    gameModeId: effectiveGameModeId,
     customGameModes,
-    mode: gameModeId,
-    selectedMode: gameModeId,
-    gameMode: gameModeId,
+    mode: effectiveGameModeId,
+    selectedMode: effectiveGameModeId,
+    gameMode: effectiveGameModeId,
     stageIndex: 0,
     currentStageIndex: 0,
     activeStageIndex: 0,
@@ -89,18 +90,20 @@ function getOrCreateSession(sessionId?: string): GameState {
 
 function createSession(
   roomName?: string,
-  gameModeId = BUILT_IN_GAME_MODES[0].id,
+  variant: GameVariant = '75-ball',
+  gameModeId = DEFAULT_GAME_MODE_ID,
   gameModeName?: unknown,
   patterns?: unknown,
 ): GameActionResult {
-  let selectedGameModeId = gameModeId;
+  if (!VARIANTS[variant]) return { error: 'Unknown variant.' };
+  let selectedGameModeId = variant === '75-ball' ? gameModeId : DEFAULT_GAME_MODE_ID;
   let customGameModes: GameState['customGameModes'] = [];
-  if (gameModeId === 'custom') {
+  if (variant === '75-ball' && gameModeId === 'custom') {
     const result = createCustomGameMode(gameModeName, patterns, BUILT_IN_GAME_MODES);
     if ('error' in result) return result;
     customGameModes = [result.mode];
     selectedGameModeId = result.mode.id;
-  } else if (!BUILT_IN_GAME_MODES.some((mode) => mode.id === gameModeId)) {
+  } else if (variant === '75-ball' && !BUILT_IN_GAME_MODES.some((mode) => mode.id === gameModeId)) {
     return { error: 'Select an available game mode for the new room.' };
   }
 
@@ -112,7 +115,7 @@ function createSession(
     sessionId = `${baseId}-${suffix}`;
     suffix += 1;
   }
-  const gameState = createNewGame('75-ball', sessionId, normalizedRoomName, selectedGameModeId, customGameModes);
+  const gameState = createNewGame(variant, sessionId, normalizedRoomName, selectedGameModeId, customGameModes);
   gameSessions.set(sessionId, {
     gameState,
     allNumbers: generateAllNumbers(VARIANTS[gameState.variant].maxNumber),
@@ -184,7 +187,7 @@ function handleGameAction(
   },
 ): GameActionResult {
   if (parsed.action === 'create-session') {
-    return createSession(parsed.roomName, parsed.gameModeId, parsed.gameModeName, parsed.patterns);
+    return createSession(parsed.roomName, parsed.variant, parsed.gameModeId, parsed.gameModeName, parsed.patterns);
   }
 
   const session = getOrCreateSession(parsed.sessionId);
@@ -274,8 +277,8 @@ function handleGameAction(
 
   if (parsed.action === 'reset') {
     const resetGame = createNewGame(session.variant, session.sessionId, session.roomName);
-    resetGame.gameModeId = session.gameModeId;
-    resetGame.customGameModes = session.customGameModes;
+    resetGame.gameModeId = session.variant === '75-ball' ? session.gameModeId : '';
+    resetGame.customGameModes = session.variant === '75-ball' ? session.customGameModes : [];
     syncStageState(resetGame, 0);
     gameSessions.set(session.sessionId, {
       gameState: resetGame,
@@ -286,6 +289,12 @@ function handleGameAction(
 
   if (parsed.action === 'change-variant' && parsed.variant && VARIANTS[parsed.variant]) {
     session.variant = parsed.variant;
+    if (parsed.variant !== '75-ball') {
+      session.gameModeId = '';
+      session.customGameModes = [];
+    } else if (!session.gameModeId) {
+      session.gameModeId = DEFAULT_GAME_MODE_ID;
+    }
     session.drawnNumbers = [];
     session.undoneNumbers = [];
     session.lastUndoneNumber = null;

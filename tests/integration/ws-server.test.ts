@@ -59,6 +59,9 @@ describe('game server (WebSocket)', () => {
       assert.equal(room.gameModeId, 'single-row');
       assert.equal(room.currentStage, 'single-row');
 
+      const defaultRoom = await send({ action: 'create-session', roomName: 'Default mode' }) as State;
+      assert.equal(defaultRoom.gameModeId, 'standard');
+
       const rejected = await send<ErrorResult>({ action: 'create-session', roomName: 'Bad', gameModeId: 'nope' });
       assert.match(rejected?.error ?? '', /game mode/i);
     });
@@ -75,6 +78,21 @@ describe('game server (WebSocket)', () => {
         action: 'create-session', roomName: 'Empty custom', gameModeId: 'custom', gameModeName: 'X', patterns: [],
       });
       assert.ok(invalid?.error);
+    });
+
+    it('does not apply game modes to non-75-ball rooms', async () => {
+      const room = await send({
+        action: 'create-session',
+        roomName: 'Ninety Ball',
+        variant: '90-ball',
+        gameModeId: 'custom',
+        gameModeName: 'Ignored',
+        patterns: ['full-card'],
+      });
+      assert.ok(room && !('error' in room));
+      assert.equal((room as State).variant, '90-ball');
+      assert.equal((room as State).gameModeId, '');
+      assert.deepEqual((room as State).customGameModes, []);
     });
 
     it('rejects changing the game mode of an existing room', async () => {
@@ -240,12 +258,18 @@ describe('game server (WebSocket)', () => {
     });
 
     it('changes variant and clears the draw state', async () => {
-      const room = await createRoom('Variant');
+      const room = await createRoom('Variant', 'custom', { gameModeName: 'Mine', patterns: ['top-row'] });
       await callNumbers(room.sessionId, [1, 2]);
       const state = await send({ action: 'change-variant', sessionId: room.sessionId, variant: '90-ball' });
       assert.equal(state?.variant, '90-ball');
       assert.deepEqual(state?.drawnNumbers, []);
       assert.equal(state?.status, 'waiting');
+      assert.equal(state?.gameModeId, '');
+      assert.deepEqual(state?.customGameModes, []);
+
+      const backTo75 = await send({ action: 'change-variant', sessionId: room.sessionId, variant: '75-ball' });
+      assert.equal(backTo75?.gameModeId, 'standard');
+      assert.deepEqual(backTo75?.customGameModes, []);
     });
   });
 

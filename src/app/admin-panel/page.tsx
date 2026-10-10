@@ -10,7 +10,7 @@ import { GameStageStatus } from '@/components/GameStageStatus';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoClaim, type BingoClaimResult } from '@/lib/bingoClaim';
 import { BINGO_PATTERNS, getBingoPatternNumberCounts, type BingoPattern } from '@/lib/bingoPatterns';
-import { BUILT_IN_GAME_MODES } from '@/lib/gameModes';
+import { BUILT_IN_GAME_MODES, DEFAULT_GAME_MODE_ID } from '@/lib/gameModes';
 import { normalizeRoomId } from '@/lib/gameRoom';
 import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 import { getWebSocketUrl } from '@/lib/websocketUrl';
@@ -24,7 +24,7 @@ function AdminPanel() {
   const [variant, setVariant] = useState<GameVariant>('75-ball');
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [newRoomName, setNewRoomName] = useState('');
-  const [newRoomGameModeId, setNewRoomGameModeId] = useState(BUILT_IN_GAME_MODES[0].id);
+  const [newRoomGameModeId, setNewRoomGameModeId] = useState(DEFAULT_GAME_MODE_ID);
   const [manualNumber, setManualNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [claimNumbers, setClaimNumbers] = useState(['', '', '', '', '']);
@@ -52,6 +52,8 @@ function AdminPanel() {
   const claimMinimum = claimCounts[0];
   const lastCall = state?.drawnNumbers.at(-1);
   const canUndo = drawMode === 'manual' && state?.status === 'in-play' && lastCall !== undefined;
+  const selectedVariant = state?.variant ?? variant;
+  const supportsGameModes = selectedVariant === '75-ball';
 
   useEffect(() => {
     setUndoConfirmation(false);
@@ -98,8 +100,9 @@ function AdminPanel() {
         body: JSON.stringify({
           action: 'create-session',
           roomName: newRoomName,
-          gameModeId: newRoomGameModeId,
-          ...(newRoomGameModeId === 'custom' ? { gameModeName, patterns: selectedPatterns } : {}),
+          variant: selectedVariant,
+          ...(supportsGameModes ? { gameModeId: newRoomGameModeId } : {}),
+          ...(supportsGameModes && newRoomGameModeId === 'custom' ? { gameModeName, patterns: selectedPatterns } : {}),
         }),
       });
       if (!response.ok) {
@@ -118,7 +121,7 @@ function AdminPanel() {
         },
       ].sort((first, second) => first.roomName.localeCompare(second.roomName)));
       setNewRoomName('');
-      setNewRoomGameModeId(BUILT_IN_GAME_MODES[0].id);
+      setNewRoomGameModeId(DEFAULT_GAME_MODE_ID);
       setGameModeName('');
       setSelectedPatterns([]);
       router.push(`/admin-panel?room=${encodeURIComponent(result.gameState.sessionId)}`);
@@ -321,6 +324,9 @@ function AdminPanel() {
             <h2 className="text-xl font-bold text-bingo-text">Create a new room</h2>
             <label htmlFor="new-room-name" className="font-bold text-bingo-text">Room name</label>
             <input id="new-room-name" type="text" value={newRoomName} onChange={(event) => setNewRoomName(event.target.value)} maxLength={40} className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text" required />
+            <p className="text-sm text-bingo-muted">New room variant: {selectedVariant}</p>
+            {supportsGameModes && (
+              <>
             <label htmlFor="new-room-game-mode" className="font-bold text-bingo-text">Room game mode</label>
             <select
               id="new-room-game-mode"
@@ -394,9 +400,11 @@ function AdminPanel() {
               </>
             )}
             <p className="text-sm text-bingo-muted">The game mode is fixed for the lifetime of the room.</p>
+              </>
+            )}
             <button
               type="submit"
-              disabled={newRoomGameModeId === 'custom' && selectedPatterns.length === 0}
+              disabled={supportsGameModes && newRoomGameModeId === 'custom' && selectedPatterns.length === 0}
               className="self-start rounded-lg bg-bingo-accent px-5 py-3 text-lg font-bold text-bingo-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Create Room

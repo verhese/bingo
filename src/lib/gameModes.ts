@@ -15,6 +15,8 @@ export const BUILT_IN_GAME_MODES: readonly GameMode[] = [
   },
 ];
 
+export const DEFAULT_GAME_MODE_ID = 'standard';
+
 export function isBingoPattern(value: unknown): value is BingoPattern {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(BINGO_PATTERNS, value);
 }

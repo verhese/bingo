@@ -21,7 +21,7 @@ The caller UI provides:
 - An active-room selector, room-creation form, and link that opens the selected game room.
 - Five recent calls, newest first.
 - Variant selection, a random draw command, a validated manual-number form, and reset.
-- When creating a room, callers can select a built-in 75-ball mode or configure a room-local custom mode by selecting and reordering registered patterns. The mode is fixed for the room's lifetime.
+- When creating a 75-ball room, callers can select a built-in mode or configure a room-local custom mode by selecting and reordering registered patterns. The mode is fixed for the room's lifetime; 90-ball and speedy rooms do not offer or store a game mode.
 - A red Undo Last Call control beside Call Number in manual mode, with an inline confirmation naming the latest call. Undo removes that call from history and the caller display, while the game board marks the number with a red X until it is called again.
 - The first accepted call locks the room to automatic or manual drawing; the opposing control and automatic-draw `Space` shortcut are disabled until reset or variant change. The locked mode is shown in the caller panel.
 - `Space` to draw and `R` to reset unless focus is in an input or select; `Escape` closes the Bingo dialog.

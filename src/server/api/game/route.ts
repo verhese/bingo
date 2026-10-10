@@ -127,14 +127,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unknown variant' }, { status: 400 });
   }
   if (action === 'create-session') {
+    if (variant !== undefined && !VARIANTS[variant]) {
+      return NextResponse.json({ error: 'Unknown variant' }, { status: 400 });
+    }
     if (
       gameModeId !== undefined
+      && (variant ?? '75-ball') === '75-ball'
       && (typeof gameModeId !== 'string'
         || (gameModeId !== 'custom' && !BUILT_IN_GAME_MODES.some((mode) => mode.id === gameModeId)))
     ) {
       return NextResponse.json({ error: 'Select an available game mode for the new room.' }, { status: 400 });
     }
-    if (gameModeId === 'custom') {
+    if (gameModeId === 'custom' && (variant ?? '75-ball') === '75-ball') {
       const validation = createCustomGameMode(gameModeName, patterns, BUILT_IN_GAME_MODES);
       if ('error' in validation) {
         return NextResponse.json({ error: validation.error }, { status: 400 });
