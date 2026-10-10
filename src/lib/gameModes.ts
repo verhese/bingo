@@ -61,3 +61,51 @@ export function getGameMode(
     ?? customModes.find((mode) => mode.id === id)
     ?? BUILT_IN_GAME_MODES[0];
 }
+
+export function getGameModeStages(
+  modeId: string | null | undefined,
+  customModes: readonly GameMode[] = [],
+): BingoPattern[] {
+  return [...getGameMode(modeId ?? BUILT_IN_GAME_MODES[0].id, customModes).patterns];
+}
+
+function clampStageIndex(stages: readonly BingoPattern[], stageIndex: number) {
+  return Math.max(0, Math.min(stageIndex, Math.max(0, stages.length - 1)));
+}
+
+export function getActiveStage(
+  modeId: string | null | undefined,
+  stageIndex: number,
+  customModes: readonly GameMode[] = [],
+): BingoPattern | undefined {
+  const stages = getGameModeStages(modeId, customModes);
+  if (stages.length === 0) return undefined;
+  return stages[clampStageIndex(stages, stageIndex)];
+}
+
+export function advanceGameModeStage(
+  modeId: string | null | undefined,
+  stageIndex: number,
+  customModes: readonly GameMode[] = [],
+) {
+  const stages = getGameModeStages(modeId, customModes);
+  const lastIndex = Math.max(0, stages.length - 1);
+  const safeIndex = clampStageIndex(stages, stageIndex);
+
+  if (safeIndex + 1 >= stages.length) {
+    return {
+      currentStageIndex: safeIndex,
+      currentStage: stages[safeIndex] ?? 'single-row',
+      isFinalStage: true,
+      isComplete: true,
+    };
+  }
+
+  const nextStageIndex = safeIndex + 1;
+  return {
+    currentStageIndex: nextStageIndex,
+    currentStage: stages[nextStageIndex],
+    isFinalStage: nextStageIndex === lastIndex,
+    isComplete: false,
+  };
+}

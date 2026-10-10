@@ -15,9 +15,19 @@ All HTTP actions return `503` with `{ "error": "Game service is unavailable" }` 
   "gameState": {
     "sessionId": "hall-a",
     "roomName": "Main Hall",
-    "variant": "90-ball",
-    "gameModeId": "single-row",
+    "variant": "75-ball",
+    "gameModeId": "standard",
     "customGameModes": [],
+    "mode": "standard",
+    "selectedMode": "standard",
+    "gameMode": "standard",
+    "stageIndex": 1,
+    "currentStageIndex": 1,
+    "activeStageIndex": 1,
+    "stage": "bottom-row",
+    "currentStage": "bottom-row",
+    "activeStage": "bottom-row",
+    "completedStages": ["top-row"],
     "drawMode": "auto",
     "drawnNumbers": [12, 42],
     "undoneNumbers": [],
@@ -30,6 +40,7 @@ All HTTP actions return `503` with `{ "error": "Game service is unavailable" }` 
 
 `variant` is `90-ball`, `75-ball`, or `speedy`; their maximum numbers are 90, 75, and 30 respectively. `status` is `waiting`, `in-play`, or `complete`. `verifiedBingo` is `null` until a valid claim is accepted.
 `gameModeId` defaults to `single-row`. The built-in modes are `single-row` and `standard`; `customGameModes` lists custom modes saved in that room. Each mode has an `id`, `name`, and ordered `patterns` array. Custom modes are in-memory only and do not survive a game-service restart.
+`mode`, `selectedMode`, and `gameMode` mirror `gameModeId`. `stageIndex`/`currentStage` identify the currently active bingo stage in the selected ordered mode; `completedStages` tracks prior stage confirmations. Reset and variant changes clear the stage state.
 `drawMode` is `null` before the first accepted call, then `auto` for random draws or `manual` for caller-entered numbers. Reset and variant changes clear the mode.
 `undoneNumbers` contains calls removed with undo; those numbers remain marked on the board until called again. Reset and variant changes clear this list.
 `lastUndoneNumber` is the most recently undone call shown in the caller display. It remains set until another number is called, then resets to `null`. Reset and variant changes also clear it.
