@@ -1,7 +1,11 @@
+import type { GameMode } from '@/lib/gameModes';
+
 export interface GameState {
   sessionId: string;
   roomName: string;
   variant: GameVariant;
+  gameModeId: string;
+  customGameModes: GameMode[];
   drawMode: 'manual' | 'auto' | null;
   drawnNumbers: number[];
   undoneNumbers: number[];

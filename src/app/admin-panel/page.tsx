@@ -8,6 +8,8 @@ import { RecentCalls } from '@/components/RecentCalls';
 import { VariantSelector } from '@/components/VariantSelector';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoClaim, type BingoClaimResult } from '@/lib/bingoClaim';
+import { BINGO_PATTERNS, type BingoPattern } from '@/lib/bingoPatterns';
+import { BUILT_IN_GAME_MODES } from '@/lib/gameModes';
 import { normalizeRoomId } from '@/lib/gameRoom';
 import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 import { getWebSocketUrl } from '@/lib/websocketUrl';
@@ -29,7 +31,16 @@ function AdminPanel() {
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
   const [undoConfirmation, setUndoConfirmation] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
-  const { drawNumber, callNumber, undoLastCall, state } = useGameSession(WS_URL, roomId);
+  const [gameModeName, setGameModeName] = useState('');
+  const [selectedPatterns, setSelectedPatterns] = useState<BingoPattern[]>([]);
+  const {
+    drawNumber,
+    callNumber,
+    undoLastCall,
+    selectGameMode,
+    createGameMode,
+    state,
+  } = useGameSession(WS_URL, roomId);
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
   const drawMode = state?.drawMode ?? null;
   const autoDrawLocked = drawMode === 'manual';
@@ -106,6 +117,45 @@ function AdminPanel() {
     } catch (variantError) {
       setServiceError(variantError instanceof Error ? variantError.message : 'Unable to change the game variant');
     }
+  };
+
+  const handleGameModeChange = async (gameModeId: string) => {
+    setServiceError(null);
+    try {
+      await selectGameMode(gameModeId);
+    } catch (modeError) {
+      setServiceError(modeError instanceof Error ? modeError.message : 'Unable to select the game mode');
+    }
+  };
+
+  const handleCreateGameMode = async (event: React.SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setServiceError(null);
+    try {
+      await createGameMode(gameModeName, selectedPatterns);
+      setGameModeName('');
+      setSelectedPatterns([]);
+    } catch (modeError) {
+      setServiceError(modeError instanceof Error ? modeError.message : 'Unable to create the game mode');
+    }
+  };
+
+  const togglePattern = (pattern: BingoPattern) => {
+    setSelectedPatterns((current) => (
+      current.includes(pattern)
+        ? current.filter((selected) => selected !== pattern)
+        : [...current, pattern]
+    ));
+  };
+
+  const movePattern = (index: number, direction: -1 | 1) => {
+    setSelectedPatterns((current) => {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= current.length) return current;
+      const reordered = [...current];
+      [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+      return reordered;
+    });
   };
 
   const handleDrawNumber = async () => {
@@ -265,6 +315,102 @@ function AdminPanel() {
           </output>
         )}
         <VariantSelector current={variant} onChange={handleVariantChange} />
+        {(state?.variant ?? variant) === '75-ball' && (
+          <section className="flex flex-col gap-3 rounded-lg border-2 border-bingo-muted bg-bingo-surface p-4">
+            <h2 className="text-xl font-bold text-bingo-text">75-ball game mode</h2>
+            <label htmlFor="game-mode" className="font-bold text-bingo-text">Select game mode</label>
+            <select
+              id="game-mode"
+              value={state?.gameModeId ?? BUILT_IN_GAME_MODES[0].id}
+              disabled={state?.status !== 'waiting'}
+              onChange={(event) => void handleGameModeChange(event.target.value)}
+              className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text disabled:opacity-50"
+            >
+              <optgroup label="Built-in modes">
+                {BUILT_IN_GAME_MODES.map((mode) => (
+                  <option key={mode.id} value={mode.id}>{mode.name}</option>
+                ))}
+              </optgroup>
+              {(state?.customGameModes.length ?? 0) > 0 && (
+                <optgroup label="Room custom modes">
+                  {state?.customGameModes.map((mode) => (
+                    <option key={mode.id} value={mode.id}>{mode.name}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            {state?.status !== 'waiting' && (
+              <p className="text-sm text-bingo-muted">Reset the game to change its mode.</p>
+            )}
+            <form onSubmit={handleCreateGameMode} className="flex flex-col gap-3 border-t border-bingo-muted pt-3">
+              <h3 className="font-bold text-bingo-text">Create a custom mode</h3>
+              <label htmlFor="game-mode-name" className="font-bold text-bingo-text">Mode name</label>
+              <input
+                id="game-mode-name"
+                type="text"
+                value={gameModeName}
+                onChange={(event) => setGameModeName(event.target.value)}
+                maxLength={40}
+                required
+                disabled={state?.status !== 'waiting'}
+                className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text disabled:opacity-50"
+              />
+              <fieldset disabled={state?.status !== 'waiting'} className="flex flex-col gap-2">
+                <legend className="mb-1 font-bold text-bingo-text">Patterns</legend>
+                {Object.keys(BINGO_PATTERNS).map((pattern) => {
+                  const typedPattern = pattern as BingoPattern;
+                  return (
+                    <label key={pattern} className="flex items-center gap-2 text-bingo-text">
+                      <input
+                        type="checkbox"
+                        checked={selectedPatterns.includes(typedPattern)}
+                        onChange={() => togglePattern(typedPattern)}
+                        className="h-5 w-5 accent-bingo-accent"
+                      />
+                      {BINGO_PATTERNS[typedPattern].name}
+                    </label>
+                  );
+                })}
+              </fieldset>
+              {selectedPatterns.length > 0 && (
+                <ol aria-label="Custom mode stage order" className="flex flex-col gap-2">
+                  {selectedPatterns.map((pattern, index) => (
+                    <li key={pattern} className="flex items-center justify-between gap-3 rounded border border-bingo-muted bg-bingo-bg px-3 py-2 text-bingo-text">
+                      <span>{index + 1}. {BINGO_PATTERNS[pattern].name}</span>
+                      <span className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => movePattern(index, -1)}
+                          disabled={state?.status !== 'waiting' || index === 0}
+                          aria-label={`Move ${BINGO_PATTERNS[pattern].name} earlier`}
+                          className="rounded border border-bingo-muted px-3 py-1 disabled:opacity-40"
+                        >
+                          Up
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => movePattern(index, 1)}
+                          disabled={state?.status !== 'waiting' || index === selectedPatterns.length - 1}
+                          aria-label={`Move ${BINGO_PATTERNS[pattern].name} later`}
+                          className="rounded border border-bingo-muted px-3 py-1 disabled:opacity-40"
+                        >
+                          Down
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              <button
+                type="submit"
+                disabled={state?.status !== 'waiting' || selectedPatterns.length === 0}
+                className="self-start rounded-lg bg-bingo-accent px-5 py-3 text-lg font-bold text-bingo-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Save and select mode
+              </button>
+            </form>
+          </section>
+        )}
         <form onSubmit={handleManualCall} className="flex flex-col gap-3">
           <label htmlFor="manual-number" className="font-bold text-bingo-text">
             Call a specific number (1-{maxNumber})

@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { VARIANTS } from '@/lib/variants';
 import { generateAllNumbers, getNextNumber } from '@/lib/bingoNumbers';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
+import { BUILT_IN_GAME_MODES, createCustomGameMode } from '@/lib/gameModes';
 import { DEFAULT_ROOM_ID, normalizeRoomId, normalizeRoomName } from '@/lib/gameRoom';
 import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 
@@ -26,6 +27,8 @@ function createNewGame(
     sessionId,
     roomName,
     variant,
+    gameModeId: BUILT_IN_GAME_MODES[0].id,
+    customGameModes: [],
     drawMode: null,
     drawnNumbers: [],
     undoneNumbers: [],
@@ -115,7 +118,17 @@ function undoLastDraw(session: GameState, expectedNumber?: number): GameActionRe
 }
 
 function handleGameAction(
-  parsed: { action: string; sessionId?: string; roomName?: string; variant?: GameVariant; number?: number; claimedNumbers?: number[] },
+  parsed: {
+    action: string;
+    sessionId?: string;
+    roomName?: string;
+    variant?: GameVariant;
+    number?: number;
+    claimedNumbers?: number[];
+    gameModeId?: string;
+    gameModeName?: unknown;
+    patterns?: unknown;
+  },
 ): GameActionResult {
   if (parsed.action === 'create-session') return createSession(parsed.roomName);
 
@@ -124,6 +137,34 @@ function handleGameAction(
   if (!sessionData) return null;
 
   if (parsed.action === 'undo-last-draw') return undoLastDraw(session, parsed.number);
+
+  if (parsed.action === 'create-game-mode') {
+    if (session.variant !== '75-ball') return { error: 'Game modes are only available for 75-ball games.' };
+    if (session.status !== 'waiting') return { error: 'Reset the game before changing its game mode.' };
+
+    const result = createCustomGameMode(
+      parsed.gameModeName,
+      parsed.patterns,
+      [...BUILT_IN_GAME_MODES, ...session.customGameModes],
+    );
+    if ('error' in result) return result;
+
+    session.customGameModes.push(result.mode);
+    session.gameModeId = result.mode.id;
+    return { ...session };
+  }
+
+  if (parsed.action === 'select-game-mode') {
+    if (session.variant !== '75-ball') return { error: 'Game modes are only available for 75-ball games.' };
+    if (session.status !== 'waiting') return { error: 'Reset the game before changing its game mode.' };
+    if (typeof parsed.gameModeId !== 'string') return { error: 'Select an available game mode.' };
+    const modeExists = [...BUILT_IN_GAME_MODES, ...session.customGameModes]
+      .some((mode) => mode.id === parsed.gameModeId);
+    if (!modeExists) return { error: 'Select an available game mode.' };
+
+    session.gameModeId = parsed.gameModeId;
+    return { ...session };
+  }
 
   if (parsed.action === 'draw' && session.drawMode === 'manual') {
     return { error: 'Draw mode is locked to manual calls. Reset the game to switch to automatic drawing.' };
@@ -169,7 +210,9 @@ function handleGameAction(
   }
 
   if (parsed.action === 'reset') {
-    const resetGame = createNewGame(session.variant, session.sessionId);
+    const resetGame = createNewGame(session.variant, session.sessionId, session.roomName);
+    resetGame.gameModeId = session.gameModeId;
+    resetGame.customGameModes = session.customGameModes;
     gameSessions.set(session.sessionId, {
       gameState: resetGame,
       allNumbers: generateAllNumbers(VARIANTS[resetGame.variant].maxNumber),
@@ -206,6 +249,9 @@ wss.on('connection', (ws: WebSocket) => {
       variant?: GameVariant;
       number?: number;
       claimedNumbers?: number[];
+      gameModeId?: string;
+      gameModeName?: unknown;
+      patterns?: unknown;
     };
     try {
       parsed = JSON.parse(data.toString());
