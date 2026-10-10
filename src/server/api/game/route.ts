@@ -38,6 +38,7 @@ function requestGameState(
     variant?: GameVariant;
     number?: number;
     claimedNumbers?: number[];
+    expectedStageIndex?: number;
     gameModeId?: string;
     gameModeName?: unknown;
     patterns?: unknown;
@@ -94,6 +95,7 @@ export async function POST(req: NextRequest) {
     variant?: GameVariant;
     number?: number;
     claimedNumbers?: number[];
+    expectedStageIndex?: number;
     gameModeId?: string;
     gameModeName?: unknown;
     patterns?: unknown;
@@ -105,7 +107,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
   }
 
-  const { action, roomName, variant, number, claimedNumbers, gameModeId, gameModeName, patterns } = body;
+  const {
+    action,
+    roomName,
+    variant,
+    number,
+    claimedNumbers,
+    expectedStageIndex,
+    gameModeId,
+    gameModeName,
+    patterns,
+  } = body;
   const sessionId = normalizeRoomId(body.sessionId);
 
   if (!['create-session', 'draw', 'call-number', 'undo-last-draw', 'reset', 'change-variant', 'verify-bingo', 'select-game-mode', 'create-game-mode'].includes(action)) {
@@ -153,7 +165,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'verify-bingo') {
+      if (!Number.isInteger(expectedStageIndex)) {
+        return NextResponse.json({ error: 'The expected game stage is required to verify Bingo.' }, { status: 400 });
+      }
       const currentState = await requestGameState({ action: 'ping', sessionId });
+      if (expectedStageIndex !== currentState.stageIndex) {
+        return NextResponse.json(
+          { error: 'The game stage changed. Review the active stage before verifying Bingo.' },
+          { status: 409 },
+        );
+      }
       const verification = verifyBingoNumbers(
         Array.isArray(claimedNumbers) ? claimedNumbers : [],
         currentState.drawnNumbers,
@@ -172,6 +193,7 @@ export async function POST(req: NextRequest) {
       variant,
       number,
       claimedNumbers,
+      expectedStageIndex,
       gameModeId,
       gameModeName,
       patterns,
