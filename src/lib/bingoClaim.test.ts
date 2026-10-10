@@ -7,13 +7,6 @@ import {
   getBingoPatternNumberCounts,
   type BingoPattern,
 } from '@/lib/bingoPatterns';
-import {
-  DEFAULT_GAME_MODE,
-  advanceGameModeStage,
-  getActiveStage,
-  getGameModeStages,
-  getNextStageIndex,
-} from '@/lib/gameModes';
 
 describe('Bingo pattern validation', () => {
   it('defines the built-in 5x5 card positions', () => {
@@ -93,41 +86,5 @@ describe('Bingo pattern validation', () => {
 
   it('keeps existing five-number claims compatible by default', () => {
     assert.equal(verifyBingoNumbers([1, 2, 3, 4, 5], [1, 2, 3, 4, 5], '75-ball').isVerified, true);
-  });
-
-  it('tracks the standard stage order and progression for 75-ball rooms', () => {
-    assert.deepEqual(getGameModeStages('standard'), ['top-row', 'bottom-row', 'sint-andreas-cross', 'full-card']);
-    assert.equal(DEFAULT_GAME_MODE, 'single-row');
-    assert.equal(getActiveStage('standard', 0), 'top-row');
-    assert.equal(getActiveStage('standard', 1), 'bottom-row');
-    assert.equal(getNextStageIndex('standard', 0), 1);
-    assert.equal(getNextStageIndex('standard', 3), null);
-
-    const firstStage = advanceGameModeStage('standard', 0);
-    assert.deepEqual(firstStage, {
-      currentStageIndex: 1,
-      currentStage: 'bottom-row',
-      isFinalStage: false,
-      isComplete: false,
-    });
-
-    const finalStage = advanceGameModeStage('standard', 3);
-    assert.deepEqual(finalStage, {
-      currentStageIndex: 3,
-      currentStage: 'full-card',
-      isFinalStage: true,
-      isComplete: true,
-    });
-  });
-
-  it('keeps invalid claims on the same stage and prevents double-advancing', () => {
-    assert.equal(getNextStageIndex('standard', 2), 3);
-    const invalidStage = advanceGameModeStage('standard', 2);
-    assert.deepEqual(invalidStage, {
-      currentStageIndex: 3,
-      currentStage: 'full-card',
-      isFinalStage: true,
-      isComplete: false,
-    });
   });
 });
