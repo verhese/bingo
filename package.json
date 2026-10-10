@@ -9,7 +9,11 @@
     "start": "next start -H 0.0.0.0",
     "start:ws": "tsx src/server/ws-server.ts",
     "lint": "eslint .",
-    "test": "tsx --test src/lib/bingoClaim.test.ts src/lib/gameModes.test.ts"
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "tsx --test \"src/**/*.test.ts\"",
+    "test:integration": "tsx --test --test-concurrency=1 \"tests/integration/*.test.ts\"",
+    "test:e2e": "playwright test",
+    "test:all": "npm test && npm run test:e2e"
   },
   "dependencies": {
     "@tailwindcss/forms": "^0.5.9",
@@ -27,6 +31,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.7.4",
     "@types/react": "^19.0.0",
