@@ -66,6 +66,16 @@ body {
   font-family: Verdana, Geneva, sans-serif;
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--bingo-accent);
+  outline-offset: 3px;
+}
+
 .game-room {
   box-sizing: border-box;
   display: grid;
@@ -237,6 +247,8 @@ body {
   background: var(--bingo-surface);
   border: 2px solid #475569;
   border-radius: 8px;
+  margin: 0;
+  list-style: none;
 }
 
 .bingo-board--90 { --board-columns: 15; --board-rows: 6; }
@@ -421,3 +433,5 @@ body {
   body * { visibility: hidden; }
   #print-area, #print-area * { visibility: visible; }
 }
+
+dialog::backdrop { background: rgb(0 0 0 / 70%); }

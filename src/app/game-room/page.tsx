@@ -58,6 +58,7 @@ function GameRoom() {
 
   return (
     <main className="game-room">
+      <h1 className="sr-only">Bingo game room</h1>
       <GameSessionBar
         roomId={roomId}
         rooms={availableRooms}

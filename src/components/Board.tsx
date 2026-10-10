@@ -23,21 +23,21 @@ export function Board({ maxNumber, drawnNumbers, undoneNumbers = [], verifiedBin
           </div>
         ) : stageStatus}
       </div>
-      <div className={`bingo-board ${layoutClass}`}>
+      <ol className={`bingo-board ${layoutClass}`} aria-label="Number board">
         {Array.from({ length: maxNumber }, (_, i) => i + 1).map((n) => {
           const drawn = drawnNumbers.includes(n);
           const undone = undoneNumbers.includes(n);
           return (
-            <span
+            <li
               key={n}
               className={`bingo-board-cell${drawn ? ' is-drawn' : ''}${undone ? ' is-undone' : ''}`}
-              aria-label={undone ? `Number ${n}, call undone` : undefined}
+              aria-label={`Number ${n}, ${undone ? 'call undone' : drawn ? 'called' : 'not called'}`}
             >
               {n}
-            </span>
+            </li>
           );
         })}
-      </div>
+      </ol>
     </section>
   );
 }

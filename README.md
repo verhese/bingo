@@ -80,6 +80,8 @@ The WebSocket process is the game authority. The HTTP route at `/api/game` valid
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the system design, [shared/flow-webservice-api-reference.md](shared/flow-webservice-api-reference.md) for the HTTP and WebSocket contracts, and [shared/flow-ui-reference.md](shared/flow-ui-reference.md) for UI behavior.
 
+See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) for the automated accessibility checks, keyboard test results, and outstanding manual screen-reader verification.
+
 ## Contributing and license
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. This project is licensed under the [MIT License](LICENSE).
