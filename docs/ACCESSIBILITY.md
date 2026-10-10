@@ -2,7 +2,9 @@
 
 ## Scope and automated checks
 
-The game room, admin panel, and player-card workflows were checked in Chromium with Playwright and axe-core. The checks cover WCAG 2.0 A/AA, WCAG 2.1 A/AA, WCAG 2.2 AA, and axe best-practice rules. The game room is checked in both light and dark themes, and the admin verification dialog is checked while open.
+The lobby, game room, admin panel, and player-card workflows were checked in Chromium with Playwright and axe-core. The checks cover WCAG 2.0 A/AA, WCAG 2.1 A/AA, WCAG 2.2 AA, and axe best-practice rules. The lobby (with a room listed) and the game room are checked in both light and dark themes, and the admin verification dialog is checked while open.
+
+The lobby lists rooms as links in a list. Each room card links to the game room, and a separate "Admin" link (accessible name "Admin for <room>", which contains its visible text) opens that room's caller controls. Loading uses an `<output>` element and load failures use an alert. Returning to the lobby after a finished game is reset is a route change with no separate screen-reader announcement; the "Lobby" heading is the first content reached. This is covered by automated checks only, not manual screen-reader testing.
 
 Run the checks with:
 
@@ -16,7 +18,7 @@ The browser checks also verify the board's called-state list semantics, the visi
 
 Playwright keyboard input verified that:
 
-- Tab moves through the admin room selector, game-room link, and room-name field in visual order, with a visible focus outline.
+- Tab moves through the admin room selector, game-room link, Lobby link, and room-name field in visual order, with a visible focus outline.
 - Space activates the focused Verify Bingo button and moves focus into the opened dialog.
 - Shift+Tab and Tab stay within the modal dialog; Escape closes it and returns focus to Verify Bingo.
 - Native buttons, selects, checkboxes, and number fields remain keyboard operable. The page-level Space shortcut is ignored while an interactive control is focused; reset is available through its button rather than a single-letter hotkey.

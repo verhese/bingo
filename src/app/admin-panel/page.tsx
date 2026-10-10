@@ -320,6 +320,12 @@ function AdminPanel() {
             >
               Open Game Room
             </a>
+            <a
+              href="/lobby"
+              className="rounded-lg border-2 border-bingo-muted px-5 py-3 text-lg font-bold text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
+            >
+              Lobby
+            </a>
           </div>
           <form onSubmit={handleCreateRoom} className="flex flex-col gap-3 rounded-lg border-2 border-bingo-muted bg-bingo-surface p-4">
             <h2 className="text-xl font-bold text-bingo-text">Create a new room</h2>

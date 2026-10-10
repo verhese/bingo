@@ -79,7 +79,34 @@ test.describe('caller workflow', () => {
     await expect(gameRoom.getByText('BINGO!')).toBeVisible();
 
     await page.getByRole('button', { name: 'Reset Game' }).click();
-    await expect(gameRoom.getByText('Stage 1/4: Top Row')).toBeVisible();
-    await expect(gameRoom.getByText('BINGO!')).toHaveCount(0);
+    await expect(gameRoom).toHaveURL(/\/lobby/);
+    await expect(gameRoom.getByRole('link', { name: /^E2E Stages/ })).toBeVisible();
+  });
+
+  test('keeps the game room open when an unfinished game is reset', async ({ page, context }) => {
+    const roomId = await createRoom(page, 'E2E Mid Reset', 'standard');
+    const gameRoom = await context.newPage();
+    await gameRoom.goto(`/game-room?room=${roomId}`);
+    await callNumbers(page, [7]);
+    await expect(gameRoom.getByText('Drawn: 1')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Reset Game' }).click();
+    await expect(gameRoom.getByText('Drawn: 0')).toBeVisible();
+    await expect(gameRoom).toHaveURL(/\/game-room/);
+  });
+
+  test('lobby lists rooms and links to the room admin panel', async ({ page }) => {
+    const roomId = await createRoom(page, 'E2E Lobby', 'standard');
+    await page.goto('/lobby');
+    await expect(page.getByRole('link', { name: /^E2E Lobby/ })).toBeVisible();
+    await page.getByRole('link', { name: 'Admin for E2E Lobby' }).click();
+    await expect(page).toHaveURL(new RegExp(`/admin-panel\\?room=${roomId}`));
+  });
+
+  test('lobby follows the saved dark theme', async ({ page }) => {
+    await page.goto('/lobby');
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });
 });

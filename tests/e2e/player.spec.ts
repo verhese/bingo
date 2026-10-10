@@ -11,14 +11,20 @@ test.describe('player workflow', () => {
     await expect.poll(async () => page.locator('#print-area').first().innerText()).not.toBe(firstCard);
   });
 
-  test('home page opens the game room', async ({ page }) => {
+  test('home page opens the lobby', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveURL(/\/game-room/);
+    await expect(page).toHaveURL(/\/lobby/);
+    await expect(page.getByRole('heading', { name: 'Lobby' })).toBeVisible();
+  });
+
+  test('game room without a room opens the lobby', async ({ page }) => {
+    await page.goto('/game-room');
+    await expect(page).toHaveURL(/\/lobby/);
   });
 
   test('game room is usable at phone width without horizontal scrolling', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/game-room');
+    await page.goto('/game-room?room=default');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });

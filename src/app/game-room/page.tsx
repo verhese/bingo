@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGameSession } from '@/lib/useGameSession';
 import { CallerDisplay } from '@/components/CallerDisplay';
@@ -11,6 +11,7 @@ import { GameStageStatus } from '@/components/GameStageStatus';
 import type { GameVariant } from '@/types/game';
 import { VARIANTS } from '@/lib/variants';
 import { normalizeRoomId } from '@/lib/gameRoom';
+import { shouldReturnToLobby, type ObservedRoomStatus } from '@/lib/lobbyRedirect';
 import { getWebSocketUrl } from '@/lib/websocketUrl';
 import type { RoomSummary } from '@/types/game';
 
@@ -19,9 +20,11 @@ const WS_URL = getWebSocketUrl();
 function GameRoom() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const hasRoom = searchParams.has('room');
   const roomId = normalizeRoomId(searchParams.get('room'));
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const { state } = useGameSession(WS_URL, roomId);
+  const previousStatus = useRef<ObservedRoomStatus | null>(null);
   const variant = (state?.variant as GameVariant) ?? '75-ball';
   const cfg = VARIANTS[variant];
   const lastUndoneNumber = state?.lastUndoneNumber ?? null;
@@ -47,6 +50,18 @@ function GameRoom() {
       isCurrent = false;
     };
   }, [roomId]);
+
+  useEffect(() => {
+    if (!hasRoom) router.replace('/lobby');
+  }, [hasRoom, router]);
+
+  useEffect(() => {
+    if (!state) return;
+    const previous = previousStatus.current;
+    const next = { roomId: state.sessionId, status: state.status };
+    previousStatus.current = next;
+    if (shouldReturnToLobby(previous, next)) router.push('/lobby');
+  }, [state, router]);
 
   const handleRoomChange = (nextRoomId: string) => {
     router.push(`/game-room?room=${encodeURIComponent(nextRoomId)}`);
