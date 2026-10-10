@@ -226,7 +226,10 @@ export async function GET(req: NextRequest) {
   try {
     const gameState = await requestGameState({ action: 'ping', sessionId });
     return NextResponse.json({ gameState });
-  } catch {
+  } catch (error) {
+    if (error instanceof GameActionRejectedError && error.message.toLowerCase().includes('not found')) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     return NextResponse.json({ error: 'Game service is unavailable' }, { status: 503 });
   }
 }

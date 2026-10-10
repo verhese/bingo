@@ -76,8 +76,16 @@ function AdminPanel() {
   }, [roomId]);
 
   useEffect(() => {
-    if (!roomId) router.replace('/lobby');
-  }, [roomId, router]);
+    if (!roomId) {
+      router.replace('/lobby');
+      return;
+    }
+
+    const roomExists = rooms.some((room) => room.sessionId === roomId);
+    if (roomsLoaded && !roomExists) {
+      router.replace('/lobby');
+    }
+  }, [roomId, rooms, roomsLoaded, router]);
 
   useEffect(() => {
     if (state) setVariant(state.variant);

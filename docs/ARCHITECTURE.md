@@ -27,7 +27,7 @@ flowchart LR
 
 ## Rooms and state
 
-The `room` browser query parameter corresponds to the API and WebSocket `sessionId`. `normalizeRoomId` accepts lower-case IDs of up to 32 characters containing letters, numbers, and hyphens; invalid or omitted values become `default`.
+The `room` browser query parameter corresponds to the API and WebSocket `sessionId`. `normalizeRoomId` accepts lower-case IDs of up to 32 characters containing letters, numbers, and hyphens; invalid or omitted values fall back to `default` only for display, but the admin panel treats that as a missing room and redirects to the lobby instead of creating a new session.
 
 Each `GameState` contains a session ID, display name, variant, selected game-mode ID, room-local custom game modes, ordered `drawnNumbers`, status, and optional verified Bingo line. Game modes are available only for 75-ball rooms; Single Row is the default, and Standard is Top Row, Bottom Row, Sint-Andreas Cross, then Full Card. Custom modes are held in process memory with their room and are lost when the service restarts. A reset keeps the variant, selected mode, and custom modes but clears all calls. Changing a variant also clears all calls.
 
@@ -39,7 +39,7 @@ The service keeps sessions in a process-local `Map`. It does not use a database,
 |---|---|
 | `/game-room` | Shows a selectable room, current variant/status/count, theme toggle, large caller display, number board, active 75-ball game stage and completed-stage progress, verified Bingo announcement, and full reverse-chronological draw history. |
 | `/admin-panel/create` | Creates a room (name, variant and, for 75-ball, game mode) and redirects to that room's game control; Cancel returns to the lobby. |
-| `/admin-panel?room=<id>` | Game control for one room, reached from the lobby's per-room Admin link or after creation. Shows the active room (name and variant), game stage/progress, draw/manual call, Bingo verification, reset, and recent calls once the room is open; a missing room redirects to the lobby. `Space` draws outside form fields. |
+| `/admin-panel?room=<id>` | Game control for one room, reached from the lobby's per-room Admin link or after creation. Shows the active room (name and variant), game stage/progress, draw/manual call, Bingo verification, reset, and recent calls once the room is open; a missing or invalid room ID selects no active room and redirects the admin panel to the lobby. `Space` draws outside form fields. |
 | `/player-card` | Generates card sets for a selected 75-ball or 90-ball room. It loads the room directory to use the selected display name as the printed card-set name and its variant as the card layout, but does not subscribe to the room or automatically mark calls. |
 
 `Board.tsx` is one conditional-layout component for 90-ball, 75-ball, and Speedy Bingo boards. `CallerDisplay.tsx` uses a polite live region for the current number. `ThemeToggle.tsx` stores the selected light or dark theme in browser local storage.

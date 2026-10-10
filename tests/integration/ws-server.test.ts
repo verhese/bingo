@@ -73,10 +73,10 @@ describe('game server (WebSocket)', () => {
       assert.match(rejected?.error ?? '', /variant/i);
 
       const room = await createRoom('Valid variant');
-      const invalidChange = await send({
+      const invalidChange = await send<ErrorResult>({
         action: 'change-variant', sessionId: room.sessionId, variant: 'toString',
       });
-      assert.equal(invalidChange, null);
+      assert.match(invalidChange?.error ?? '', /fixed when/i);
       const unchanged = await send({ action: 'ping', sessionId: room.sessionId });
       assert.equal(unchanged?.variant, '75-ball');
     });
@@ -274,13 +274,23 @@ describe('game server (WebSocket)', () => {
     it('does not allow the variant to change after creation', async () => {
       const room = await createRoom('Variant', 'custom', { gameModeName: 'Mine', patterns: ['top-row'] });
       await callNumbers(room.sessionId, [1, 2]);
-      const rejected = await send({ action: 'change-variant', sessionId: room.sessionId, variant: '90-ball' });
-      assert.equal(rejected, null);
+      const rejected = await send<ErrorResult>({ action: 'change-variant', sessionId: room.sessionId, variant: '90-ball' });
+      assert.match(rejected?.error ?? '', /fixed when/i);
 
       const state = await send({ action: 'ping', sessionId: room.sessionId });
       assert.equal(state?.variant, '75-ball');
       assert.deepEqual(state?.drawnNumbers, [1, 2]);
       assert.equal(state?.gameModeId, room.gameModeId);
+    });
+
+    it('returns an error instead of creating missing rooms on read or subscribe', async () => {
+      const ping = await send<ErrorResult>({ action: 'ping', sessionId: 'missing-room' });
+      const subscribe = await send<ErrorResult>({ action: 'subscribe', sessionId: 'missing-room' });
+      assert.match(ping?.error ?? '', /not found/i);
+      assert.match(subscribe?.error ?? '', /not found/i);
+
+      const list = await send<{ sessions: { sessionId: string }[] }>({ action: 'list-sessions' });
+      assert.ok(!list?.sessions.some((room) => room.sessionId === 'missing-room'));
     });
   });
 

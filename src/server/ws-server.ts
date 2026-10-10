@@ -75,11 +75,16 @@ function syncStageState(session: GameState, stageIndex = session.stageIndex ?? 0
   return session;
 }
 
+function getSession(sessionId?: string): GameState | null {
+  const normalizedSessionId = normalizeRoomId(sessionId);
+  const session = gameSessions.get(normalizedSessionId);
+  return session ? session.gameState : null;
+}
+
 function getOrCreateSession(sessionId?: string): GameState {
   const normalizedSessionId = normalizeRoomId(sessionId);
-  if (gameSessions.has(normalizedSessionId)) {
-    return gameSessions.get(normalizedSessionId)!.gameState;
-  }
+  const existingSession = getSession(normalizedSessionId);
+  if (existingSession) return existingSession;
   const newGame = createNewGame('75-ball', normalizedSessionId, normalizedSessionId);
   gameSessions.set(newGame.sessionId, {
     gameState: newGame,
@@ -190,9 +195,10 @@ function handleGameAction(
     return createSession(parsed.roomName, parsed.variant, parsed.gameModeId, parsed.gameModeName, parsed.patterns);
   }
 
-  const session = getOrCreateSession(parsed.sessionId);
+  const session = getSession(parsed.sessionId);
+  if (!session) return { error: 'Room not found.' };
   const sessionData = gameSessions.get(session.sessionId);
-  if (!sessionData) return null;
+  if (!sessionData) return { error: 'Room not found.' };
 
   if (parsed.action === 'undo-last-draw') return undoLastDraw(session, parsed.number);
 
@@ -202,6 +208,10 @@ function handleGameAction(
 
   if (parsed.action === 'select-game-mode') {
     return { error: 'A room game mode is fixed when the room is created.' };
+  }
+
+  if (parsed.action === 'change-variant') {
+    return { error: 'A room game variant is fixed when the room is created.' };
   }
 
   if (
@@ -313,7 +323,11 @@ wss.on('connection', (ws: WebSocket) => {
     }
 
     if (parsed.action === 'subscribe') {
-      const session = getOrCreateSession(parsed.sessionId);
+      const session = getSession(parsed.sessionId);
+      if (!session) {
+        ws.send(JSON.stringify({ error: 'Room not found.' }));
+        return;
+      }
       clientSessionIds.set(ws, session.sessionId);
       ws.send(JSON.stringify(session));
       return;
@@ -325,7 +339,12 @@ wss.on('connection', (ws: WebSocket) => {
     }
 
     if (parsed.action === 'ping') {
-      ws.send(JSON.stringify(getOrCreateSession(parsed.sessionId)));
+      const session = getSession(parsed.sessionId);
+      if (!session) {
+        ws.send(JSON.stringify({ error: 'Room not found.' }));
+        return;
+      }
+      ws.send(JSON.stringify(session));
       return;
     }
 

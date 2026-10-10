@@ -45,7 +45,7 @@ The Next.js app runs at `http://localhost:3000`; the WebSocket game service runs
 | `http://localhost:3000/admin-panel?room=<id>` | Caller game controls for one room |
 | `http://localhost:3000/player-card` | Player-card generation, printing, and PDF download |
 
-Use the same `room` value in the game room and admin URLs to share a session, for example `?room=hall-a`. Missing or invalid room IDs select `default`.
+Use the same `room` value in the game room and admin URLs to share a session, for example `?room=hall-a`. Missing or invalid room IDs redirect the admin panel to the lobby instead of creating a room.
 
 ## Scripts
 
