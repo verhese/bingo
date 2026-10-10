@@ -20,8 +20,9 @@ const WS_URL = getWebSocketUrl();
 function GameRoom() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const hasRoom = searchParams.has('room');
-  const roomId = normalizeRoomId(searchParams.get('room'));
+  const room = searchParams.get('room');
+  const hasRoom = Boolean(room?.trim());
+  const roomId = normalizeRoomId(room);
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const { state } = useGameSession(WS_URL, roomId);
   const previousStatus = useRef<ObservedRoomStatus | null>(null);

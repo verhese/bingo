@@ -17,9 +17,11 @@ test.describe('player workflow', () => {
     await expect(page.getByRole('heading', { name: 'Lobby' })).toBeVisible();
   });
 
-  test('game room without a room opens the lobby', async ({ page }) => {
-    await page.goto('/game-room');
-    await expect(page).toHaveURL(/\/lobby/);
+  test('game room without a nonblank room opens the lobby', async ({ page }) => {
+    for (const path of ['/game-room', '/game-room?room=', '/game-room?room=%20%20']) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/lobby/);
+    }
   });
 
   test('game room is usable at phone width without horizontal scrolling', async ({ page }) => {
