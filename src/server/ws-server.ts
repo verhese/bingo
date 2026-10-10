@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { VARIANTS } from '@/lib/variants';
+import { isGameVariant, VARIANTS } from '@/lib/variants';
 import { generateAllNumbers, getNextNumber } from '@/lib/bingoNumbers';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
 import { BUILT_IN_GAME_MODES, DEFAULT_GAME_MODE_ID, advanceGameModeStage, createCustomGameMode, getActiveStage, getGameModeStages } from '@/lib/gameModes';
@@ -95,7 +95,7 @@ function createSession(
   gameModeName?: unknown,
   patterns?: unknown,
 ): GameActionResult {
-  if (!VARIANTS[variant]) return { error: 'Unknown variant.' };
+  if (!isGameVariant(variant)) return { error: 'Unknown variant.' };
   let selectedGameModeId = variant === '75-ball' ? gameModeId : DEFAULT_GAME_MODE_ID;
   let customGameModes: GameState['customGameModes'] = [];
   if (variant === '75-ball' && gameModeId === 'custom') {
@@ -287,7 +287,7 @@ function handleGameAction(
     return resetGame;
   }
 
-  if (parsed.action === 'change-variant' && parsed.variant && VARIANTS[parsed.variant]) {
+  if (parsed.action === 'change-variant' && isGameVariant(parsed.variant)) {
     session.variant = parsed.variant;
     if (parsed.variant !== '75-ball') {
       session.gameModeId = '';

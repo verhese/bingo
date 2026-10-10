@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import WebSocket, { type RawData } from 'ws';
-import { VARIANTS } from '@/lib/variants';
+import { isGameVariant, VARIANTS } from '@/lib/variants';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
 import { BUILT_IN_GAME_MODES, createCustomGameMode } from '@/lib/gameModes';
 import { normalizeRoomId } from '@/lib/gameRoom';
@@ -123,11 +123,11 @@ export async function POST(req: NextRequest) {
   if (!['create-session', 'draw', 'call-number', 'undo-last-draw', 'reset', 'change-variant', 'verify-bingo', 'select-game-mode', 'create-game-mode'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
-  if (action === 'change-variant' && (!variant || !VARIANTS[variant])) {
+  if (action === 'change-variant' && !isGameVariant(variant)) {
     return NextResponse.json({ error: 'Unknown variant' }, { status: 400 });
   }
   if (action === 'create-session') {
-    if (variant !== undefined && !VARIANTS[variant]) {
+    if (variant !== undefined && !isGameVariant(variant)) {
       return NextResponse.json({ error: 'Unknown variant' }, { status: 400 });
     }
     if (

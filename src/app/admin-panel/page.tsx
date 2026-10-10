@@ -24,6 +24,7 @@ function AdminPanel() {
   const [variant, setVariant] = useState<GameVariant>('75-ball');
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [newRoomName, setNewRoomName] = useState('');
+  const [newRoomVariant, setNewRoomVariant] = useState<GameVariant>('75-ball');
   const [newRoomGameModeId, setNewRoomGameModeId] = useState(DEFAULT_GAME_MODE_ID);
   const [manualNumber, setManualNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -52,8 +53,7 @@ function AdminPanel() {
   const claimMinimum = claimCounts[0];
   const lastCall = state?.drawnNumbers.at(-1);
   const canUndo = drawMode === 'manual' && state?.status === 'in-play' && lastCall !== undefined;
-  const selectedVariant = state?.variant ?? variant;
-  const supportsGameModes = selectedVariant === '75-ball';
+  const supportsGameModes = newRoomVariant === '75-ball';
 
   useEffect(() => {
     setUndoConfirmation(false);
@@ -100,7 +100,7 @@ function AdminPanel() {
         body: JSON.stringify({
           action: 'create-session',
           roomName: newRoomName,
-          variant: selectedVariant,
+          variant: newRoomVariant,
           ...(supportsGameModes ? { gameModeId: newRoomGameModeId } : {}),
           ...(supportsGameModes && newRoomGameModeId === 'custom' ? { gameModeName, patterns: selectedPatterns } : {}),
         }),
@@ -121,6 +121,7 @@ function AdminPanel() {
         },
       ].sort((first, second) => first.roomName.localeCompare(second.roomName)));
       setNewRoomName('');
+      setNewRoomVariant('75-ball');
       setNewRoomGameModeId(DEFAULT_GAME_MODE_ID);
       setGameModeName('');
       setSelectedPatterns([]);
@@ -324,7 +325,17 @@ function AdminPanel() {
             <h2 className="text-xl font-bold text-bingo-text">Create a new room</h2>
             <label htmlFor="new-room-name" className="font-bold text-bingo-text">Room name</label>
             <input id="new-room-name" type="text" value={newRoomName} onChange={(event) => setNewRoomName(event.target.value)} maxLength={40} className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text" required />
-            <p className="text-sm text-bingo-muted">New room variant: {selectedVariant}</p>
+            <label htmlFor="new-room-variant" className="font-bold text-bingo-text">New room variant</label>
+            <select
+              id="new-room-variant"
+              value={newRoomVariant}
+              onChange={(event) => setNewRoomVariant(event.target.value as GameVariant)}
+              className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text"
+            >
+              {Object.values(VARIANTS).map((item) => (
+                <option key={item.name} value={item.name}>{item.name}</option>
+              ))}
+            </select>
             {supportsGameModes && (
               <>
             <label htmlFor="new-room-game-mode" className="font-bold text-bingo-text">Room game mode</label>

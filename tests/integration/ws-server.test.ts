@@ -66,6 +66,21 @@ describe('game server (WebSocket)', () => {
       assert.match(rejected?.error ?? '', /game mode/i);
     });
 
+    it('rejects inherited variant names from direct WebSocket clients', async () => {
+      const rejected = await send<ErrorResult>({
+        action: 'create-session', roomName: 'Inherited variant', variant: 'toString',
+      });
+      assert.match(rejected?.error ?? '', /variant/i);
+
+      const room = await createRoom('Valid variant');
+      const invalidChange = await send({
+        action: 'change-variant', sessionId: room.sessionId, variant: 'toString',
+      });
+      assert.equal(invalidChange, null);
+      const unchanged = await send({ action: 'ping', sessionId: room.sessionId });
+      assert.equal(unchanged?.variant, '75-ball');
+    });
+
     it('supports custom modes defined at creation', async () => {
       const room = await createRoom('Custom', 'custom', {
         gameModeName: 'Corners',
