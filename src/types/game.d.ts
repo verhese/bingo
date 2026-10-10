@@ -1,7 +1,22 @@
+import type { BingoPattern } from '@/lib/bingoPatterns';
+import type { GameMode } from '@/lib/gameModes';
+
 export interface GameState {
   sessionId: string;
   roomName: string;
   variant: GameVariant;
+  gameModeId: string;
+  customGameModes: GameMode[];
+  mode: string;
+  selectedMode: string;
+  gameMode: string;
+  stageIndex: number;
+  currentStageIndex: number;
+  activeStageIndex: number;
+  stage: BingoPattern;
+  currentStage: BingoPattern;
+  activeStage: BingoPattern;
+  completedStages: BingoPattern[];
   drawMode: 'manual' | 'auto' | null;
   drawnNumbers: number[];
   undoneNumbers: number[];

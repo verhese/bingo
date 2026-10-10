@@ -7,14 +7,24 @@ Bingo is an accessibility-focused web app for community bingo sessions. It gives
 - Large live caller display and responsive drawn-number board.
 - Independent named game rooms using a `room` query parameter.
 - 90-ball, 75-ball, and Speedy Bingo variants.
+- Built-in Single Row and Standard game modes, plus room-local custom 75-ball modes with reorderable stages.
 - Random draws, validated manual calls, resets, variant changes, and five-number Bingo-claim verification.
 - Live room-scoped updates over WebSocket.
 - High-contrast light theme, persisted dark-theme option, and keyboard caller controls.
 - Printable 75-ball and 90-ball card sets with browser print and A4 PDF download.
 
+## 75-ball game modes
+
+Choose a game mode when creating a room; that mode is fixed for the room, including after a reset. A verified Bingo claim completes the current stage and advances the game to the next one:
+
+- **Single Row** — one stage; a player wins by completing any horizontal row on their card.
+- **Standard** — four stages, in order: **Top Row**, **Bottom Row**, **Sint-Andreas Cross** (the X-shaped pattern), then **Full Card**. The game is complete when a claim for the full card is verified.
+
+When creating a room, you can also define a custom mode by selecting patterns and arranging their stage order. Custom modes belong to that room. Game modes are available for 75-ball games.
+
 ## Requirements
 
-- Node.js 18 or later
+- Node.js 20.9 or later
 - npm
 
 ## Local development
@@ -46,8 +56,13 @@ Use the same `room` value in the game room and admin URLs to share a session, fo
 | `npm run start` | Start the production Next.js server. |
 | `npm run start:ws` | Start the WebSocket game service. |
 | `npm run lint` | Run ESLint across the project. |
+| `npm test` | Run unit and integration tests. |
+| `npm run test:unit` | Run unit tests for pure game rules and utilities (`src/**/*.test.ts`). |
+| `npm run test:integration` | Start a throwaway WebSocket game server on a free port and test its actions and the `/api/game` handlers (`tests/integration`). |
+| `npm run test:e2e` | Run Playwright browser tests against isolated servers on ports 3100/3101 (`tests/e2e`). |
+| `npm run test:all` | Run every test suite. |
 
-Automated test scripts are not configured yet.
+Before the first end-to-end run, install the browser with `npx playwright install chromium`. The test suites start their own servers and keep no state, so they can run while the development servers are running. CI runs them in `.github/workflows/tests.yml`.
 
 ## Docker deployment
 

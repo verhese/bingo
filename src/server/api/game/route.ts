@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import WebSocket, { type RawData } from 'ws';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
+import { BUILT_IN_GAME_MODES, createCustomGameMode } from '@/lib/gameModes';
 import { normalizeRoomId } from '@/lib/gameRoom';
 import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 
@@ -31,12 +32,16 @@ function parseResponseText(data: RawData): string {
 
 function requestGameState(
   message: {
-    action: 'create-session' | 'draw' | 'call-number' | 'undo-last-draw' | 'reset' | 'change-variant' | 'verify-bingo' | 'ping';
+    action: 'create-session' | 'draw' | 'call-number' | 'undo-last-draw' | 'reset' | 'change-variant' | 'verify-bingo' | 'select-game-mode' | 'create-game-mode' | 'ping';
     sessionId?: string;
     roomName?: string;
     variant?: GameVariant;
     number?: number;
     claimedNumbers?: number[];
+    expectedStageIndex?: number;
+    gameModeId?: string;
+    gameModeName?: unknown;
+    patterns?: unknown;
   },
 ): Promise<GameState> {
   return new Promise((resolve, reject) => {
@@ -84,12 +89,16 @@ function requestSessions(): Promise<RoomSummary[]> {
 // POST /api/game — Handles draw and reset actions
 export async function POST(req: NextRequest) {
   let body: {
-    action: 'create-session' | 'draw' | 'call-number' | 'undo-last-draw' | 'reset' | 'change-variant' | 'verify-bingo';
+    action: 'create-session' | 'draw' | 'call-number' | 'undo-last-draw' | 'reset' | 'change-variant' | 'verify-bingo' | 'select-game-mode' | 'create-game-mode';
     sessionId?: string;
     roomName?: string;
     variant?: GameVariant;
     number?: number;
     claimedNumbers?: number[];
+    expectedStageIndex?: number;
+    gameModeId?: string;
+    gameModeName?: unknown;
+    patterns?: unknown;
   };
 
   try {
@@ -98,16 +107,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
   }
 
-  const { action, roomName, variant, number, claimedNumbers } = body;
+  const {
+    action,
+    roomName,
+    variant,
+    number,
+    claimedNumbers,
+    expectedStageIndex,
+    gameModeId,
+    gameModeName,
+    patterns,
+  } = body;
   const sessionId = normalizeRoomId(body.sessionId);
 
-  if (!['create-session', 'draw', 'call-number', 'undo-last-draw', 'reset', 'change-variant', 'verify-bingo'].includes(action)) {
+  if (!['create-session', 'draw', 'call-number', 'undo-last-draw', 'reset', 'change-variant', 'verify-bingo', 'select-game-mode', 'create-game-mode'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
   if (action === 'change-variant' && (!variant || !VARIANTS[variant])) {
     return NextResponse.json({ error: 'Unknown variant' }, { status: 400 });
   }
-
+  if (action === 'create-session') {
+    if (
+      gameModeId !== undefined
+      && (typeof gameModeId !== 'string'
+        || (gameModeId !== 'custom' && !BUILT_IN_GAME_MODES.some((mode) => mode.id === gameModeId)))
+    ) {
+      return NextResponse.json({ error: 'Select an available game mode for the new room.' }, { status: 400 });
+    }
+    if (gameModeId === 'custom') {
+      const validation = createCustomGameMode(gameModeName, patterns, BUILT_IN_GAME_MODES);
+      if ('error' in validation) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
+    }
+  }
+  if (action === 'select-game-mode' || action === 'create-game-mode') {
+    return NextResponse.json({ error: 'A room game mode is fixed when the room is created.' }, { status: 409 });
+  }
   try {
     if (action === 'call-number') {
       const currentState = await requestGameState({ action: 'ping', sessionId });
@@ -129,18 +165,39 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'verify-bingo') {
+      if (!Number.isInteger(expectedStageIndex)) {
+        return NextResponse.json({ error: 'The expected game stage is required to verify Bingo.' }, { status: 400 });
+      }
       const currentState = await requestGameState({ action: 'ping', sessionId });
+      if (expectedStageIndex !== currentState.stageIndex) {
+        return NextResponse.json(
+          { error: 'The game stage changed. Review the active stage before verifying Bingo.' },
+          { status: 409 },
+        );
+      }
       const verification = verifyBingoNumbers(
         Array.isArray(claimedNumbers) ? claimedNumbers : [],
         currentState.drawnNumbers,
         currentState.variant,
+        currentState.variant === '75-ball' ? currentState.currentStage : 'single-row',
       );
       if (!verification.isVerified) {
         return NextResponse.json({ error: 'The claimed line cannot be verified' }, { status: 400 });
       }
     }
 
-    const gameState = await requestGameState({ action, sessionId, roomName, variant, number, claimedNumbers });
+    const gameState = await requestGameState({
+      action,
+      sessionId,
+      roomName,
+      variant,
+      number,
+      claimedNumbers,
+      expectedStageIndex,
+      gameModeId,
+      gameModeName,
+      patterns,
+    });
     return NextResponse.json({ gameState });
   } catch (error) {
     if (error instanceof GameActionRejectedError) {

@@ -39,3 +39,8 @@ pnpm-debug.log*
 next-env.d.ts
 bingo-web.tar.gz
 bingo.code-workspace
+
+# Playwright
+/.next-e2e/
+/test-results/
+/playwright-report/
