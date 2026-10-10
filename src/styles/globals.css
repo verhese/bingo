@@ -88,7 +88,7 @@ textarea:focus-visible,
 
 .game-session-bar {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto auto;
   gap: 1rem;
   align-items: center;
   padding: 1rem 1.5rem;

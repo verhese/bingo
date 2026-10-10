@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 
 test.describe('accessibility', () => {
-  for (const route of ['/game-room', '/admin-panel', '/player-card']) {
+  for (const route of ['/lobby', '/game-room?room=default', '/admin-panel', '/player-card']) {
     test(`${route} has no axe WCAG A/AA or best-practice violations`, async ({ page }) => {
       await page.goto(route);
       if (route === '/player-card') {
@@ -16,14 +16,41 @@ test.describe('accessibility', () => {
   }
 
   test('game room exposes each number and its called state in the board list', async ({ page }) => {
-    await page.goto('/game-room');
+    await page.goto('/game-room?room=default');
     const board = page.getByRole('list', { name: 'Number board' });
     await expect(board).toBeVisible();
     await expect(board.getByRole('listitem').first()).toHaveAccessibleName(/Number 1,/);
   });
 
+  test('lobby with a room passes the automated checks in both themes and keeps link names consistent', async ({ page }) => {
+    await page.goto('/admin-panel');
+    await page.getByLabel('Room name').fill('A11y Lobby');
+    await page.getByRole('button', { name: 'Create Room' }).click();
+    await page.waitForURL(/room=/);
+
+    await page.goto('/lobby');
+    const adminLink = page.getByRole('link', { name: 'Admin for A11y Lobby' });
+    await expect(adminLink).toBeVisible();
+    await expect(adminLink).toContainText('Admin');
+    let results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
+    expect(results.violations).toEqual([]);
+
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+    results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
+    expect(results.violations).toEqual([]);
+  });
+
+  test('lobby theme toggle is the first tab stop with a visible focus indicator', async ({ page }) => {
+    await page.goto('/lobby');
+    await page.keyboard.press('Tab');
+    const toggle = page.getByRole('button', { name: 'Switch to dark mode' });
+    await expect(toggle).toBeFocused();
+    const outlineStyle = await toggle.evaluate((element) => getComputedStyle(element).outlineStyle);
+    expect(outlineStyle).not.toBe('none');
+  });
+
   test('game room dark theme passes the automated checks', async ({ page }) => {
-    await page.goto('/game-room');
+    await page.goto('/game-room?room=default');
     await page.getByRole('button', { name: 'Switch to dark mode' }).click();
     const results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
     expect(results.violations).toEqual([]);
@@ -87,6 +114,8 @@ test.describe('accessibility', () => {
 
     await page.keyboard.press('Tab');
     await expect(page.getByRole('link', { name: 'Open Game Room' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('link', { name: 'Lobby' })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(page.locator('#new-room-name')).toBeFocused();
   });

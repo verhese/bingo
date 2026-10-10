@@ -22,6 +22,7 @@ export function GameSessionBar({ roomId, rooms, onRoomChange, variant, drawnCoun
       <span>Variant: {variant}</span>
       <span>Drawn: {drawnCount}</span>
       <span className="text-bingo-accent capitalize">Status: {status}</span>
+      <a href="/lobby" className="font-bold underline">Lobby</a>
       <ThemeToggle />
     </header>
   );
