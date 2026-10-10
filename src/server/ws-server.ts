@@ -3,7 +3,8 @@ import { VARIANTS } from '@/lib/variants';
 import { generateAllNumbers, getNextNumber } from '@/lib/bingoNumbers';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
 import { DEFAULT_ROOM_ID, normalizeRoomId, normalizeRoomName } from '@/lib/gameRoom';
-import type { GameState, GameVariant, RoomSummary } from '@/types/game';
+import { DEFAULT_GAME_MODE, advanceGameModeStage, getActiveStage, getGameModeStages, normalizeGameMode } from '@/lib/gameModes';
+import type { GameState, GameMode, GameVariant, RoomSummary } from '@/types/game';
 
 interface GameSession {
   gameState: GameState;
@@ -22,10 +23,22 @@ function createNewGame(
 ): GameState {
   const cfg = VARIANTS[variant];
   if (!cfg) throw new Error(`Unknown variant: ${variant}`);
+  const mode = normalizeGameMode(DEFAULT_GAME_MODE);
+  const stage = getActiveStage(mode, 0) ?? 'single-row';
   return {
     sessionId,
     roomName,
     variant,
+    mode,
+    selectedMode: mode,
+    gameMode: mode,
+    stageIndex: 0,
+    currentStageIndex: 0,
+    activeStageIndex: 0,
+    stage,
+    currentStage: stage,
+    activeStage: stage,
+    completedStages: [],
     drawMode: null,
     drawnNumbers: [],
     undoneNumbers: [],
@@ -33,6 +46,29 @@ function createNewGame(
     status: 'waiting',
     verifiedBingo: null,
   };
+}
+
+function resolveRoomMode(session: GameState): GameMode {
+  if (session.variant !== '75-ball') return 'single-row';
+  return normalizeGameMode(session.mode ?? session.gameMode ?? session.selectedMode ?? DEFAULT_GAME_MODE);
+}
+
+function syncStageState(session: GameState, mode: GameMode = resolveRoomMode(session), stageIndex = session.stageIndex ?? 0) {
+  const normalizedMode = normalizeGameMode(mode);
+  const stages = getGameModeStages(normalizedMode);
+  const safeIndex = Math.max(0, Math.min(stageIndex, Math.max(0, stages.length - 1)));
+  const currentStage = getActiveStage(normalizedMode, safeIndex) ?? 'single-row';
+
+  session.mode = normalizedMode;
+  session.selectedMode = normalizedMode;
+  session.gameMode = normalizedMode;
+  session.stageIndex = safeIndex;
+  session.currentStageIndex = safeIndex;
+  session.activeStageIndex = safeIndex;
+  session.stage = currentStage;
+  session.currentStage = currentStage;
+  session.activeStage = currentStage;
+  return session;
 }
 
 function getOrCreateSession(sessionId?: string): GameState {
@@ -157,19 +193,34 @@ function handleGameAction(
   }
 
   if (parsed.action === 'verify-bingo') {
+    const currentMode = resolveRoomMode(session);
+    const activeStage = getActiveStage(currentMode, session.stageIndex ?? 0) ?? 'single-row';
     const verification = verifyBingoNumbers(
       parsed.claimedNumbers ?? [],
       session.drawnNumbers,
       session.variant,
+      session.variant === '75-ball' ? activeStage : 'single-row',
     );
     if (!verification.isVerified) return null;
 
     session.verifiedBingo = { claimedNumbers: verification.claimedNumbers };
+    if (session.variant !== '75-ball') {
+      return { ...session };
+    }
+
+    const nextStageState = advanceGameModeStage(currentMode, session.stageIndex ?? 0);
+    syncStageState(session, currentMode, nextStageState.currentStageIndex);
+    session.completedStages = Array.from(new Set([
+      ...session.completedStages,
+      activeStage,
+    ]));
+    session.status = nextStageState.isComplete ? 'complete' : 'in-play';
     return { ...session };
   }
 
   if (parsed.action === 'reset') {
     const resetGame = createNewGame(session.variant, session.sessionId);
+    syncStageState(resetGame, DEFAULT_GAME_MODE, 0);
     gameSessions.set(session.sessionId, {
       gameState: resetGame,
       allNumbers: generateAllNumbers(VARIANTS[resetGame.variant].maxNumber),
@@ -185,6 +236,8 @@ function handleGameAction(
     session.status = 'waiting';
     session.drawMode = null;
     session.verifiedBingo = null;
+    const nextMode = parsed.variant === '75-ball' ? normalizeGameMode(session.mode ?? session.gameMode ?? session.selectedMode ?? DEFAULT_GAME_MODE) : 'single-row';
+    syncStageState(session, nextMode, 0);
     gameSessions.set(session.sessionId, {
       gameState: session,
       allNumbers: generateAllNumbers(VARIANTS[parsed.variant].maxNumber),
