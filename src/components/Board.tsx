@@ -3,9 +3,10 @@ interface BoardProps {
   readonly drawnNumbers: readonly number[];
   readonly undoneNumbers?: readonly number[];
   readonly verifiedBingo?: readonly number[] | null;
+  readonly stageStatus?: React.ReactNode;
 }
 
-export function Board({ maxNumber, drawnNumbers, undoneNumbers = [], verifiedBingo }: BoardProps) {
+export function Board({ maxNumber, drawnNumbers, undoneNumbers = [], verifiedBingo, stageStatus }: BoardProps) {
   const layoutClass = maxNumber === 90
     ? 'bingo-board--90'
     : maxNumber === 75
@@ -20,6 +21,7 @@ export function Board({ maxNumber, drawnNumbers, undoneNumbers = [], verifiedBin
           <span>Verified winning line: {verifiedBingo.join(', ')}</span>
         </div>
       )}
+      {stageStatus}
       <div className={`bingo-board ${layoutClass}`}>
         {Array.from({ length: maxNumber }, (_, i) => i + 1).map((n) => {
           const drawn = drawnNumbers.includes(n);

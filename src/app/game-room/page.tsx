@@ -7,6 +7,7 @@ import { CallerDisplay } from '@/components/CallerDisplay';
 import { Board } from '@/components/Board';
 import { DrawHistory } from '@/components/DrawHistory';
 import { GameSessionBar } from '@/components/GameSessionBar';
+import { GameStageStatus } from '@/components/GameStageStatus';
 import type { GameVariant } from '@/types/game';
 import { VARIANTS } from '@/lib/variants';
 import { normalizeRoomId } from '@/lib/gameRoom';
@@ -72,6 +73,7 @@ function GameRoom() {
           drawnNumbers={state?.drawnNumbers ?? []}
           undoneNumbers={state?.undoneNumbers ?? []}
           verifiedBingo={state?.verifiedBingo?.claimedNumbers}
+          stageStatus={<GameStageStatus state={state} />}
         />
         <DrawHistory drawnNumbers={state?.drawnNumbers ?? []} />
       </div>

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useGameSession } from '@/lib/useGameSession';
 import { RecentCalls } from '@/components/RecentCalls';
 import { VariantSelector } from '@/components/VariantSelector';
+import { GameStageStatus } from '@/components/GameStageStatus';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoClaim, type BingoClaimResult } from '@/lib/bingoClaim';
 import { normalizeRoomId } from '@/lib/gameRoom';
@@ -229,6 +230,7 @@ function AdminPanel() {
         </div>
       )}
       <h1 className="mb-8 heading-lg font-bold text-bingo-text">Admin Panel</h1>
+      <GameStageStatus state={state} />
       <div className="flex flex-col gap-6">
         <section className="flex flex-col gap-3">
           <label htmlFor="room-id" className="font-bold text-bingo-text">Active room</label>
