@@ -75,16 +75,28 @@ describe('HTTP API /api/game', () => {
     const id = await createRoom('Stage claims');
     for (const number of range(1, 20)) await post({ action: 'call-number', sessionId: id, number });
 
-    assert.equal((await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: [1, 2, 3, 4, 99] })).status, 400);
-    assert.equal((await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5) })).status, 200);
-    assert.equal((await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(6, 10) })).status, 200);
+    assert.equal((await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: [1, 2, 3, 4, 99], expectedStageIndex: 0 })).status, 400);
+    assert.equal((await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5), expectedStageIndex: 0 })).status, 200);
+    assert.equal((await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(6, 10), expectedStageIndex: 1 })).status, 200);
 
-    const fiveForCross = await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5) });
+    const fiveForCross = await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5), expectedStageIndex: 2 });
     assert.equal(fiveForCross.status, 400);
 
-    const cross = await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 8) });
+    const cross = await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 8), expectedStageIndex: 2 });
     assert.equal(cross.status, 200);
     assert.equal(cross.body.gameState.currentStage, 'full-card');
+  });
+
+  it('requires the expected stage and rejects a stale one', async () => {
+    const id = await createRoom('Stale api');
+    for (const number of range(1, 10)) await post({ action: 'call-number', sessionId: id, number });
+
+    const missing = await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5) });
+    assert.equal(missing.status, 400);
+
+    assert.equal((await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5), expectedStageIndex: 0 })).status, 200);
+    const stale = await post({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(6, 10), expectedStageIndex: 0 });
+    assert.equal(stale.status, 409);
   });
 
   it('keeps rooms isolated and resets only the targeted room', async () => {

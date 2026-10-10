@@ -156,7 +156,7 @@ describe('game server (WebSocket)', () => {
         assert.equal(before?.currentStage, stage);
         assert.equal(before?.stageIndex, index);
 
-        const result = await send({ action: 'verify-bingo', sessionId: id, claimedNumbers: numbers });
+        const result = await send({ action: 'verify-bingo', sessionId: id, claimedNumbers: numbers, expectedStageIndex: index });
         assert.deepEqual(result?.verifiedBingo?.claimedNumbers, numbers);
         assert.ok(result?.completedStages.includes(stage));
       }
@@ -170,10 +170,10 @@ describe('game server (WebSocket)', () => {
       const room = await createRoom('Cross count');
       const id = room.sessionId;
       await callNumbers(id, range(1, 20));
-      await send({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5) });
-      await send({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(6, 10) });
+      await send({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5), expectedStageIndex: 0 });
+      await send({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(6, 10), expectedStageIndex: 1 });
 
-      assert.equal(await send({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5) }), null);
+      assert.equal(await send({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5), expectedStageIndex: 2 }), null);
       const state = await send({ action: 'ping', sessionId: id });
       assert.equal(state?.currentStage, 'sint-andreas-cross');
       assert.deepEqual(state?.verifiedBingo?.claimedNumbers, range(6, 10));
@@ -183,14 +183,31 @@ describe('game server (WebSocket)', () => {
     it('ignores claims containing numbers that were not drawn', async () => {
       const room = await createRoom('Undrawn claim');
       await callNumbers(room.sessionId, range(1, 4));
-      const result = await send({ action: 'verify-bingo', sessionId: room.sessionId, claimedNumbers: range(1, 5) });
+      const result = await send({ action: 'verify-bingo', sessionId: room.sessionId, claimedNumbers: range(1, 5), expectedStageIndex: 0 });
       assert.equal(result, null);
+    });
+
+    it('requires the expected stage and rejects a stale one', async () => {
+      const room = await createRoom('Stale stage');
+      const id = room.sessionId;
+      await callNumbers(id, range(1, 10));
+
+      const missing = await send<ErrorResult>({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5) });
+      assert.match(missing?.error ?? '', /expected game stage/i);
+
+      await send({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5), expectedStageIndex: 0 });
+      const stale = await send<ErrorResult>({
+        action: 'verify-bingo', sessionId: id, claimedNumbers: range(6, 10), expectedStageIndex: 0,
+      });
+      assert.match(stale?.error ?? '', /stage changed/i);
+      const state = await send({ action: 'ping', sessionId: id });
+      assert.equal(state?.stageIndex, 1);
     });
 
     it('clears a verified bingo when the next number is called', async () => {
       const room = await createRoom('Clear banner');
       await callNumbers(room.sessionId, range(1, 5));
-      await send({ action: 'verify-bingo', sessionId: room.sessionId, claimedNumbers: range(1, 5) });
+      await send({ action: 'verify-bingo', sessionId: room.sessionId, claimedNumbers: range(1, 5), expectedStageIndex: 0 });
       const after = await send({ action: 'call-number', sessionId: room.sessionId, number: 20 });
       assert.equal(after?.verifiedBingo, null);
     });
@@ -201,7 +218,7 @@ describe('game server (WebSocket)', () => {
       const room = await createRoom('Reset me', 'custom', { gameModeName: 'Mine', patterns: ['top-row', 'full-card'] });
       const id = room.sessionId;
       await callNumbers(id, range(1, 5));
-      await send({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5) });
+      await send({ action: 'verify-bingo', sessionId: id, claimedNumbers: range(1, 5), expectedStageIndex: 0 });
 
       const reset = await send({ action: 'reset', sessionId: id });
       assert.deepEqual(reset?.drawnNumbers, []);
