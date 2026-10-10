@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import WebSocket, { type RawData } from 'ws';
-import { VARIANTS } from '@/lib/variants';
+import { isGameVariant, VARIANTS } from '@/lib/variants';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
 import { BUILT_IN_GAME_MODES, createCustomGameMode } from '@/lib/gameModes';
 import { normalizeRoomId } from '@/lib/gameRoom';
@@ -123,18 +123,22 @@ export async function POST(req: NextRequest) {
   if (!['create-session', 'draw', 'call-number', 'undo-last-draw', 'reset', 'change-variant', 'verify-bingo', 'select-game-mode', 'create-game-mode'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
-  if (action === 'change-variant' && (!variant || !VARIANTS[variant])) {
+  if (action === 'change-variant' && !isGameVariant(variant)) {
     return NextResponse.json({ error: 'Unknown variant' }, { status: 400 });
   }
   if (action === 'create-session') {
+    if (variant !== undefined && !isGameVariant(variant)) {
+      return NextResponse.json({ error: 'Unknown variant' }, { status: 400 });
+    }
     if (
       gameModeId !== undefined
+      && (variant ?? '75-ball') === '75-ball'
       && (typeof gameModeId !== 'string'
         || (gameModeId !== 'custom' && !BUILT_IN_GAME_MODES.some((mode) => mode.id === gameModeId)))
     ) {
       return NextResponse.json({ error: 'Select an available game mode for the new room.' }, { status: 400 });
     }
-    if (gameModeId === 'custom') {
+    if (gameModeId === 'custom' && (variant ?? '75-ball') === '75-ball') {
       const validation = createCustomGameMode(gameModeName, patterns, BUILT_IN_GAME_MODES);
       if ('error' in validation) {
         return NextResponse.json({ error: validation.error }, { status: 400 });

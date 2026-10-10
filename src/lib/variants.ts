@@ -6,6 +6,10 @@ export const VARIANTS: Record<GameVariant, VariantConfig> = {
   speedy: { name: 'speedy', maxNumber: 30, cardsPerGame: 50, drawIntervalMs: 8000 },
 };
 
+export function isGameVariant(value: unknown): value is GameVariant {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(VARIANTS, value);
+}
+
 export function getVariant(name: GameVariant): VariantConfig | undefined {
   return VARIANTS[name];
 }

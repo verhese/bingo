@@ -44,6 +44,8 @@ describe('HTTP API /api/game', () => {
     assert.equal((await post('not json')).status, 400);
     assert.equal((await post({ action: 'explode' })).status, 400);
     assert.equal((await post({ action: 'change-variant', variant: 'bogus' })).status, 400);
+    assert.equal((await post({ action: 'create-session', variant: 'toString' })).status, 400);
+    assert.equal((await post({ action: 'change-variant', variant: 'toString' })).status, 400);
   });
 
   it('creates a room and exposes it through the room list and state endpoints', async () => {
