@@ -1,12 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
 async function createRoom(page: Page, name: string, mode: string) {
-  await page.goto('/admin-panel');
+  await page.goto('/admin-panel/create');
   await page.getByLabel('Room name').fill(name);
-  await page.getByLabel('Room game mode').selectOption(mode);
+  await page.getByLabel('New room game mode').selectOption(mode);
   await page.getByRole('button', { name: 'Create Room' }).click();
   await page.waitForURL(/room=/);
-  await expect(page.getByText('fixed when this room was created')).toBeVisible();
+  await expect(page.getByText('fixed when this room was created').first()).toBeVisible();
   return new URL(page.url()).searchParams.get('room') as string;
 }
 
@@ -58,7 +58,7 @@ test.describe('caller workflow', () => {
 
   test('keeps the room game mode fixed during play', async ({ page }) => {
     await createRoom(page, 'E2E Fixed', 'standard');
-    await expect(page.getByLabel('Room game mode')).toHaveCount(1);
+    await expect(page.getByLabel('New room game mode')).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: /^game mode$/i })).toHaveCount(0);
     await expect(page.getByText('Standard — fixed when this room was created.')).toBeVisible();
   });

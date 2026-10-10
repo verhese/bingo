@@ -93,7 +93,7 @@ textarea:focus-visible,
   align-items: center;
   padding: 1rem 1.5rem;
   background: var(--bingo-surface);
-  border: 2px solid #475569;
+  border: 2px solid var(--bingo-border);
   border-radius: 8px;
   font-size: clamp(1.1rem, 1.8vw, 1.75rem);
   font-weight: 700;
@@ -102,6 +102,85 @@ textarea:focus-visible,
 .game-session-bar span:nth-child(2) { text-align: center; }
 .game-session-bar span:nth-child(3) { text-align: center; }
 .game-session-bar span:nth-child(4) { color: var(--bingo-accent); text-align: right; }
+
+.page-shell {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 1.6vw, 1.5rem);
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: clamp(0.75rem, 1.8vw, 2rem);
+  background: var(--bingo-bg);
+  color: var(--bingo-text);
+}
+
+.page-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--bingo-surface);
+  border: 2px solid var(--bingo-border);
+  border-radius: 8px;
+  font-size: clamp(1.1rem, 1.8vw, 1.75rem);
+  font-weight: 700;
+}
+
+.page-bar h1 {
+  margin: 0;
+  font-size: inherit;
+}
+
+.page-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.bar-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--bingo-border);
+  border-radius: 8px;
+  color: var(--bingo-text);
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.bar-button:hover {
+  border-color: var(--bingo-accent);
+  color: var(--bingo-accent);
+}
+
+.bar-button-primary {
+  background: var(--bingo-accent);
+  border-color: var(--bingo-accent);
+  color: var(--bingo-bg);
+}
+
+.bar-button-primary:hover {
+  color: var(--bingo-bg);
+  opacity: 0.9;
+}
+
+.page-content {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 1.6vw, 1.5rem);
+  width: 100%;
+}
+
+.page-panel {
+  background: var(--bingo-surface);
+  border: 2px solid var(--bingo-border);
+  border-radius: 8px;
+  padding: 1rem;
+}
 
 .game-stage-status {
   display: flex;
@@ -123,28 +202,6 @@ textarea:focus-visible,
 .game-stage-status span {
   color: var(--bingo-muted);
   font-size: clamp(0.8rem, min(1.2vw, 2.5vh), 1.1rem);
-  font-weight: 700;
-}
-
-.game-session-room {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.game-session-room select {
-  min-width: 0;
-  flex: 1 1 auto;
-  width: 100%;
-  max-width: 20rem;
-  text-overflow: ellipsis;
-  padding: 0.35rem 1.75rem 0.35rem 0.5rem;
-  background: var(--bingo-bg);
-  border: 2px solid var(--bingo-border);
-  border-radius: 6px;
-  color: var(--bingo-text);
-  font: inherit;
   font-weight: 700;
 }
 

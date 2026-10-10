@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGameSession } from '@/lib/useGameSession';
 import { CallerDisplay } from '@/components/CallerDisplay';
@@ -13,7 +13,6 @@ import { VARIANTS } from '@/lib/variants';
 import { normalizeRoomId } from '@/lib/gameRoom';
 import { shouldReturnToLobby, type ObservedRoomStatus } from '@/lib/lobbyRedirect';
 import { getWebSocketUrl } from '@/lib/websocketUrl';
-import type { RoomSummary } from '@/types/game';
 
 const WS_URL = getWebSocketUrl();
 
@@ -23,34 +22,12 @@ function GameRoom() {
   const room = searchParams.get('room');
   const hasRoom = Boolean(room?.trim());
   const roomId = normalizeRoomId(room);
-  const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const { state } = useGameSession(WS_URL, roomId);
   const previousStatus = useRef<ObservedRoomStatus | null>(null);
   const variant = (state?.variant as GameVariant) ?? '75-ball';
   const cfg = VARIANTS[variant];
   const lastUndoneNumber = state?.lastUndoneNumber ?? null;
   const callerNumber = lastUndoneNumber ?? state?.drawnNumbers.at(-1) ?? null;
-
-  useEffect(() => {
-    let isCurrent = true;
-
-    const loadRooms = async () => {
-      try {
-        const response = await fetch('/api/game?rooms=true');
-        if (!response.ok) return;
-        const result = (await response.json()) as { sessions?: unknown };
-        if (!Array.isArray(result.sessions) || !isCurrent) return;
-        setRooms(result.sessions as RoomSummary[]);
-      } catch {
-        // Keep the current room available if the room list cannot be loaded.
-      }
-    };
-
-    void loadRooms();
-    return () => {
-      isCurrent = false;
-    };
-  }, [roomId]);
 
   useEffect(() => {
     if (!hasRoom) router.replace('/lobby');
@@ -64,21 +41,11 @@ function GameRoom() {
     if (shouldReturnToLobby(previous, next)) router.push('/lobby');
   }, [state, router]);
 
-  const handleRoomChange = (nextRoomId: string) => {
-    router.push(`/game-room?room=${encodeURIComponent(nextRoomId)}`);
-  };
-
-  const availableRooms = rooms.some((room) => room.sessionId === roomId)
-    ? rooms
-    : [{ sessionId: roomId, roomName: roomId, variant, drawnCount: 0, status: 'waiting' as const }, ...rooms];
-
   return (
     <main className="game-room">
       <h1 className="sr-only">Bingo game room</h1>
       <GameSessionBar
-        roomId={roomId}
-        rooms={availableRooms}
-        onRoomChange={handleRoomChange}
+        roomName={state?.roomName ?? roomId}
         variant={cfg.name}
         drawnCount={state?.drawnNumbers.length ?? 0}
         status={state?.status ?? 'waiting'}

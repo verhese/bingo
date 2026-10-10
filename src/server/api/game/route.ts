@@ -123,9 +123,6 @@ export async function POST(req: NextRequest) {
   if (!['create-session', 'draw', 'call-number', 'undo-last-draw', 'reset', 'change-variant', 'verify-bingo', 'select-game-mode', 'create-game-mode'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
-  if (action === 'change-variant' && !isGameVariant(variant)) {
-    return NextResponse.json({ error: 'Unknown variant' }, { status: 400 });
-  }
   if (action === 'create-session') {
     if (variant !== undefined && !isGameVariant(variant)) {
       return NextResponse.json({ error: 'Unknown variant' }, { status: 400 });
@@ -147,6 +144,9 @@ export async function POST(req: NextRequest) {
   }
   if (action === 'select-game-mode' || action === 'create-game-mode') {
     return NextResponse.json({ error: 'A room game mode is fixed when the room is created.' }, { status: 409 });
+  }
+  if (action === 'change-variant') {
+    return NextResponse.json({ error: 'A room game variant is fixed when the room is created.' }, { status: 409 });
   }
   try {
     if (action === 'call-number') {
@@ -226,7 +226,10 @@ export async function GET(req: NextRequest) {
   try {
     const gameState = await requestGameState({ action: 'ping', sessionId });
     return NextResponse.json({ gameState });
-  } catch {
+  } catch (error) {
+    if (error instanceof GameActionRejectedError && error.message.toLowerCase().includes('not found')) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     return NextResponse.json({ error: 'Game service is unavailable' }, { status: 503 });
   }
 }
