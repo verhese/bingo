@@ -177,6 +177,11 @@ body {
   min-height: 0;
 }
 
+.bingo-board-header {
+  display: grid;
+  gap: clamp(0.5rem, 1vw, 0.75rem);
+}
+
 .bingo-announcement {
   display: flex;
   align-items: baseline;

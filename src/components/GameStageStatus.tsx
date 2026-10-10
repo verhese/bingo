@@ -9,7 +9,7 @@ interface GameStageStatusProps {
 export function GameStageStatus({ state }: GameStageStatusProps) {
   if (!state || state.variant !== '75-ball') return null;
 
-  const stages = getGameModeStages(state.mode);
+  const stages = getGameModeStages(state.gameModeId, state.customGameModes);
   const activeStageIndex = Math.max(0, Math.min(state.stageIndex, stages.length - 1));
   const activeStage = stages[activeStageIndex];
 
