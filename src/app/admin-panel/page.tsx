@@ -221,7 +221,12 @@ function AdminPanel() {
       const response = await fetch('/api/game', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify-bingo', sessionId: roomId, claimedNumbers: verification.claimedNumbers }),
+        body: JSON.stringify({
+          action: 'verify-bingo',
+          sessionId: roomId,
+          claimedNumbers: verification.claimedNumbers,
+          expectedStageIndex: state?.stageIndex,
+        }),
       });
       if (!response.ok) {
         const result = (await response.json()) as { error?: string };
@@ -260,7 +265,7 @@ function AdminPanel() {
   }, [handleKeyDown]);
 
   return (
-    <div className="flex h-screen w-screen flex-col items-center justify-center bg-bingo-bg p-8 text-2xl">
+    <div className="flex min-h-screen w-screen flex-col items-center justify-center bg-bingo-bg p-8 text-2xl">
       {serviceError && (
         <div role="alert" className="fixed right-4 top-4 z-50 flex max-w-md items-start gap-3 rounded-lg border-2 border-bingo-danger bg-bingo-surface p-4 text-lg text-bingo-text shadow-2xl">
           <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-bingo-danger" aria-hidden="true" />

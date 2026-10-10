@@ -62,6 +62,14 @@ describe('Bingo pattern validation', () => {
     assert.equal(verifyBingoNumbers([1, 2, 3, 4, 5], [1, 2, 3, 4, 5], '75-ball').isVerified, true);
   });
 
+  it('requires five-number claims for non-75-ball variants', () => {
+    for (const variant of ['90-ball', 'speedy'] as const) {
+      assert.deepEqual(verifyBingoNumbers([1, 2, 3, 4], [1, 2, 3, 4], variant).requiredNumberCounts, [5]);
+      assert.equal(verifyBingoNumbers([1, 2, 3, 4], [1, 2, 3, 4], variant).isVerified, false);
+      assert.equal(verifyBingoNumbers([1, 2, 3, 4, 5], [1, 2, 3, 4, 5], variant).isVerified, true);
+    }
+  });
+
   it('accepts four-number center columns and five-number columns', () => {
     assert.deepEqual(getBingoPatternNumberCounts('single-column'), [4, 5]);
     assert.equal(

@@ -17,7 +17,7 @@ export function verifyBingoNumbers(
   pattern: BingoPattern = 'single-row',
 ): BingoClaimResult {
   const maxNumber = VARIANTS[variant].maxNumber;
-  const requiredNumberCounts = getBingoPatternNumberCounts(pattern);
+  const requiredNumberCounts = variant === '75-ball' ? getBingoPatternNumberCounts(pattern) : [5];
   const invalidNumbers = claimedNumbers.filter(
     (number, index) => !Number.isInteger(number) || number < 1 || number > maxNumber || claimedNumbers.indexOf(number) !== index,
   );

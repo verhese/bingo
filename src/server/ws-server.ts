@@ -177,6 +177,7 @@ function handleGameAction(
     variant?: GameVariant;
     number?: number;
     claimedNumbers?: number[];
+    expectedStageIndex?: number;
     gameModeId?: string;
     gameModeName?: unknown;
     patterns?: unknown;
@@ -198,6 +199,13 @@ function handleGameAction(
 
   if (parsed.action === 'select-game-mode') {
     return { error: 'A room game mode is fixed when the room is created.' };
+  }
+
+  if (
+    session.status === 'complete'
+    && ['draw', 'call-number', 'undo-last-draw', 'verify-bingo'].includes(parsed.action)
+  ) {
+    return { error: 'The game is complete. Reset the game before continuing.' };
   }
 
   if (parsed.action === 'draw' && session.drawMode === 'manual') {
@@ -232,6 +240,13 @@ function handleGameAction(
   }
 
   if (parsed.action === 'verify-bingo') {
+    if (!Number.isInteger(parsed.expectedStageIndex)) {
+      return { error: 'The expected game stage is required to verify Bingo.' };
+    }
+    if (parsed.expectedStageIndex !== session.stageIndex) {
+      return { error: 'The game stage changed. Review the active stage before verifying Bingo.' };
+    }
+
     const stages = getStages(session);
     const activeStage = stages[Math.min(session.stageIndex ?? 0, stages.length - 1)] ?? 'single-row';
     const verification = verifyBingoNumbers(
@@ -300,6 +315,7 @@ wss.on('connection', (ws: WebSocket) => {
       variant?: GameVariant;
       number?: number;
       claimedNumbers?: number[];
+      expectedStageIndex?: number;
       gameModeId?: string;
       gameModeName?: unknown;
       patterns?: unknown;
