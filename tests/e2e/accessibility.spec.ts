@@ -34,7 +34,14 @@ test.describe('accessibility', () => {
     await page.getByLabel('Room name').fill('A11y 90-ball cards');
     await page.getByRole('button', { name: 'Create Room' }).click();
     await page.waitForURL(/room=/);
+    const variantChange = page.waitForResponse((response) =>
+      response.url().endsWith('/api/game')
+      && response.request().method() === 'POST'
+      && response.request().postDataJSON().action === 'change-variant'
+      && response.ok(),
+    );
     await page.getByRole('combobox', { name: 'Game variant' }).selectOption('90-ball');
+    await variantChange;
 
     await page.goto('/player-card');
     await page.getByLabel('Card set room').selectOption({ label: 'A11y 90-ball cards - 90-ball' });
