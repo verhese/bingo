@@ -21,6 +21,7 @@ export function CallerDisplay({ number, isUndone = false, className }: CallerDis
       {isUndone && <span className="caller-undone-label">Last call undone</span>}
       <span
         className={cn('caller-value', isUndone && 'caller-value--undone')}
+        role="status"
         aria-label={ariaLabel}
         aria-live="polite"
         aria-atomic="true"

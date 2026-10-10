@@ -56,7 +56,7 @@ export function generate90BallCard(_count: number = 1): { row: number[]; blanks:
     [50, 59],  // col 5
     [60, 69],  // col 6
     [70, 79],  // col 7
-    [80, 89],  // col 8
+    [80, 90],  // col 8
   ];
 
   let blankColumns: Set<number>[];

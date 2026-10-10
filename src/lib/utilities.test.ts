@@ -67,7 +67,7 @@ describe('card generation', () => {
       assert.equal(blanks.filter((blank) => !blank).length, 5);
     });
 
-    const ranges = [[1, 9], [10, 19], [20, 29], [30, 39], [40, 49], [50, 59], [60, 69], [70, 79], [80, 89]];
+    const ranges = [[1, 9], [10, 19], [20, 29], [30, 39], [40, 49], [50, 59], [60, 69], [70, 79], [80, 90]];
     ranges.forEach(([min, max], col) => {
       const numbers = card.filter(({ blanks }) => !blanks[col]).map(({ row }) => row[col]);
       assert.ok(numbers.length > 0, `column ${col} should contain at least one number`);

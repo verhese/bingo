@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { AlertTriangle, RotateCcw, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGameSession } from '@/lib/useGameSession';
@@ -35,6 +35,7 @@ function AdminPanel() {
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [gameModeName, setGameModeName] = useState('');
   const [selectedPatterns, setSelectedPatterns] = useState<BingoPattern[]>([]);
+  const verifyDialogRef = useRef<HTMLDialogElement>(null);
   const {
     drawNumber,
     callNumber,
@@ -79,6 +80,14 @@ function AdminPanel() {
   useEffect(() => {
     setClaimNumbers(Array.from({ length: claimFieldCount }, () => ''));
   }, [claimFieldCount, claimPattern]);
+
+  useEffect(() => {
+    const dialog = verifyDialogRef.current;
+    if (isVerifyDialogOpen && dialog && !dialog.open) {
+      dialog.showModal();
+      dialog.querySelector<HTMLInputElement>('input[type="number"]')?.focus();
+    }
+  }, [isVerifyDialogOpen]);
 
   const handleCreateRoom = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -243,21 +252,23 @@ function AdminPanel() {
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' && isVerifyDialogOpen) {
-      setIsVerifyDialogOpen(false);
-      return;
-    }
-
-    // Ignore if user is typing in an input/select
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+    const target = e.target;
+    if (
+      e.altKey
+      || e.ctrlKey
+      || e.metaKey
+      || e.shiftKey
+      || e.repeat
+      || !(target instanceof HTMLElement)
+      || target.isContentEditable
+      || target.closest('input, select, textarea, button, a, [role="dialog"], [role="button"], [role="checkbox"], [role="radio"], [role="switch"], [contenteditable="true"]')
+    ) return;
 
     if (e.code === 'Space') {
       e.preventDefault(); // Prevent page scroll
       if (!autoDrawLocked) void handleDrawNumber();
-    } else if (e.key === 'r' || e.key === 'R') {
-      void handleReset();
     }
-  }, [autoDrawLocked, handleDrawNumber, handleReset, isVerifyDialogOpen]);
+  }, [autoDrawLocked, handleDrawNumber]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -265,7 +276,7 @@ function AdminPanel() {
   }, [handleKeyDown]);
 
   return (
-    <div className="flex min-h-screen w-screen flex-col items-center justify-center bg-bingo-bg p-8 text-2xl">
+    <main className="flex min-h-screen w-screen flex-col items-center justify-center bg-bingo-bg p-8 text-2xl">
       {serviceError && (
         <div role="alert" className="fixed right-4 top-4 z-50 flex max-w-md items-start gap-3 rounded-lg border-2 border-bingo-danger bg-bingo-surface p-4 text-lg text-bingo-text shadow-2xl">
           <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-bingo-danger" aria-hidden="true" />
@@ -465,6 +476,7 @@ function AdminPanel() {
           type="button"
           onClick={handleDrawNumber}
           disabled={autoDrawLocked}
+          aria-keyshortcuts="Space"
           className="rounded-xl bg-bingo-accent px-8 py-4 text-3xl font-bold text-bingo-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Draw Number
@@ -484,18 +496,16 @@ function AdminPanel() {
           Reset Game
         </button>
         <p className="text-sm text-bingo-muted">
-          Keyboard: <kbd className="rounded bg-bingo-surface px-1.5 py-0.5 font-mono text-base">Space</kbd> = Draw,{' '}
-          <kbd className="rounded bg-bingo-surface px-1.5 py-0.5 font-mono text-base">R</kbd> = Reset
+          Press <kbd className="rounded bg-bingo-surface px-1.5 py-0.5 font-mono text-base">Space</kbd> to draw when focus is outside an interactive control.
         </p>
       </div>
       {isVerifyDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
+          <dialog
+            ref={verifyDialogRef}
             aria-labelledby="verify-bingo-title"
             aria-describedby="verify-bingo-description"
-            className="w-full max-w-2xl rounded-lg border-2 border-bingo-muted bg-bingo-surface p-6 shadow-2xl"
+            onClose={() => setIsVerifyDialogOpen(false)}
+            className="m-auto w-[calc(100%-2rem)] max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border-2 border-bingo-muted bg-bingo-surface p-6 text-bingo-text shadow-2xl"
           >
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
@@ -504,12 +514,11 @@ function AdminPanel() {
               </div>
               <button
                 type="button"
-                onClick={() => setIsVerifyDialogOpen(false)}
-                title="Close verification dialog"
+                onClick={() => verifyDialogRef.current?.close()}
+                aria-label="Close verification dialog"
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border-2 border-bingo-muted text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
               >
                 <X className="h-6 w-6" aria-hidden="true" />
-                <span className="sr-only">Close</span>
               </button>
             </div>
             <form onSubmit={handleClaimVerification} className="flex flex-col gap-4">
@@ -543,7 +552,7 @@ function AdminPanel() {
               <div className="flex flex-wrap justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsVerifyDialogOpen(false)}
+                  onClick={() => verifyDialogRef.current?.close()}
                   className="rounded-lg border-2 border-bingo-muted px-6 py-3 text-xl font-bold text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
                 >
                   Cancel
@@ -576,10 +585,9 @@ function AdminPanel() {
               )}
               {claimError && <p role="alert" className="font-bold text-bingo-danger">{claimError}</p>}
             </form>
-          </div>
-        </div>
+          </dialog>
       )}
-    </div>
+    </main>
   );
 }
 

@@ -10,6 +10,7 @@ interface VariantSelectorProps {
 export function VariantSelector({ current, onChange, locked }: VariantSelectorProps) {
   return (
     <select
+      aria-label="Game variant"
       className="rounded border border-bingo-muted bg-bingo-surface px-4 py-2 text-xl text-bingo-text"
       value={current}
       disabled={locked}
