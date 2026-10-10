@@ -1,14 +1,15 @@
 import type { BingoPattern } from '@/lib/bingoPatterns';
-
-export type GameMode = 'single-row' | 'standard';
+import type { GameMode } from '@/lib/gameModes';
 
 export interface GameState {
   sessionId: string;
   roomName: string;
   variant: GameVariant;
-  mode: GameMode;
-  selectedMode: GameMode;
-  gameMode: GameMode;
+  gameModeId: string;
+  customGameModes: GameMode[];
+  mode: string;
+  selectedMode: string;
+  gameMode: string;
   stageIndex: number;
   currentStageIndex: number;
   activeStageIndex: number;

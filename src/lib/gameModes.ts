@@ -1,51 +1,98 @@
-import type { BingoPattern } from '@/lib/bingoPatterns';
+import { BINGO_PATTERNS, type BingoPattern } from '@/lib/bingoPatterns';
 
-export const GAME_MODES = {
-  'single-row': {
-    name: 'Single Row',
-    stages: ['single-row'] as BingoPattern[],
-  },
-  standard: {
+export interface GameMode {
+  id: string;
+  name: string;
+  patterns: BingoPattern[];
+}
+
+export const BUILT_IN_GAME_MODES: readonly GameMode[] = [
+  { id: 'single-row', name: 'Single Row', patterns: ['single-row'] },
+  {
+    id: 'standard',
     name: 'Standard',
-    stages: ['top-row', 'bottom-row', 'sint-andreas-cross', 'full-card'] as BingoPattern[],
+    patterns: ['top-row', 'bottom-row', 'sint-andreas-cross', 'full-card'],
   },
-} as const;
+];
 
-export type GameMode = keyof typeof GAME_MODES;
-
-export const DEFAULT_GAME_MODE: GameMode = 'single-row';
-
-export function normalizeGameMode(mode?: string | null): GameMode {
-  return mode === 'standard' ? 'standard' : 'single-row';
+export function isBingoPattern(value: unknown): value is BingoPattern {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(BINGO_PATTERNS, value);
 }
 
-export function getGameModeStages(mode?: GameMode | string | null): BingoPattern[] {
-  const normalizedMode = normalizeGameMode(mode);
-  return [...GAME_MODES[normalizedMode].stages];
+export function createCustomGameMode(
+  name: unknown,
+  patterns: unknown,
+  existingModes: readonly GameMode[],
+): { mode: GameMode } | { error: string } {
+  if (typeof name !== 'string' || name.trim().length === 0 || name.trim().length > 40) {
+    return { error: 'Enter a game mode name from 1 to 40 characters.' };
+  }
+  if (
+    !Array.isArray(patterns)
+    || patterns.length === 0
+    || patterns.some((pattern) => !isBingoPattern(pattern))
+    || new Set(patterns).size !== patterns.length
+  ) {
+    return { error: 'Select one or more unique available patterns.' };
+  }
+
+  const normalizedName = name.trim();
+  if (existingModes.some((mode) => mode.name.toLocaleLowerCase() === normalizedName.toLocaleLowerCase())) {
+    return { error: 'A game mode with that name already exists.' };
+  }
+
+  const slug = normalizedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'mode';
+  const baseId = `custom-${slug}`;
+  let id = baseId;
+  let suffix = 2;
+  while (existingModes.some((mode) => mode.id === id)) {
+    id = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  return { mode: { id, name: normalizedName, patterns: [...patterns] } };
 }
 
-export function getActiveStage(mode: GameMode | string | null, stageIndex: number): BingoPattern | undefined {
-  const stages = getGameModeStages(mode);
+export function getGameMode(
+  id: string,
+  customModes: readonly GameMode[],
+): GameMode {
+  return BUILT_IN_GAME_MODES.find((mode) => mode.id === id)
+    ?? customModes.find((mode) => mode.id === id)
+    ?? BUILT_IN_GAME_MODES[0];
+}
+
+export function getGameModeStages(
+  modeId: string | null | undefined,
+  customModes: readonly GameMode[] = [],
+): BingoPattern[] {
+  return [...getGameMode(modeId ?? BUILT_IN_GAME_MODES[0].id, customModes).patterns];
+}
+
+function clampStageIndex(stages: readonly BingoPattern[], stageIndex: number) {
+  return Math.max(0, Math.min(stageIndex, Math.max(0, stages.length - 1)));
+}
+
+export function getActiveStage(
+  modeId: string | null | undefined,
+  stageIndex: number,
+  customModes: readonly GameMode[] = [],
+): BingoPattern | undefined {
+  const stages = getGameModeStages(modeId, customModes);
   if (stages.length === 0) return undefined;
-  const safeIndex = Math.max(0, Math.min(stageIndex, stages.length - 1));
-  return stages[safeIndex];
+  return stages[clampStageIndex(stages, stageIndex)];
 }
 
-export function getNextStageIndex(mode: GameMode | string | null, stageIndex: number): number | null {
-  const stages = getGameModeStages(mode);
-  if (stages.length === 0) return null;
-  const safeIndex = Math.max(0, Math.min(stageIndex, stages.length - 1));
-  return safeIndex + 1 < stages.length ? safeIndex + 1 : null;
-}
-
-export function advanceGameModeStage(mode: GameMode | string | null, stageIndex: number) {
-  const normalizedMode = normalizeGameMode(mode);
-  const stages = getGameModeStages(normalizedMode);
+export function advanceGameModeStage(
+  modeId: string | null | undefined,
+  stageIndex: number,
+  customModes: readonly GameMode[] = [],
+) {
+  const stages = getGameModeStages(modeId, customModes);
   const lastIndex = Math.max(0, stages.length - 1);
-  const safeIndex = Math.max(0, Math.min(stageIndex, lastIndex));
-  const nextStageIndex = getNextStageIndex(normalizedMode, safeIndex);
+  const safeIndex = clampStageIndex(stages, stageIndex);
 
-  if (nextStageIndex === null) {
+  if (safeIndex + 1 >= stages.length) {
     return {
       currentStageIndex: safeIndex,
       currentStage: stages[safeIndex] ?? 'single-row',
@@ -54,6 +101,7 @@ export function advanceGameModeStage(mode: GameMode | string | null, stageIndex:
     };
   }
 
+  const nextStageIndex = safeIndex + 1;
   return {
     currentStageIndex: nextStageIndex,
     currentStage: stages[nextStageIndex],

@@ -2,9 +2,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { VARIANTS } from '@/lib/variants';
 import { generateAllNumbers, getNextNumber } from '@/lib/bingoNumbers';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
+import { BUILT_IN_GAME_MODES, advanceGameModeStage, createCustomGameMode, getActiveStage, getGameModeStages } from '@/lib/gameModes';
 import { DEFAULT_ROOM_ID, normalizeRoomId, normalizeRoomName } from '@/lib/gameRoom';
-import { DEFAULT_GAME_MODE, advanceGameModeStage, getActiveStage, getGameModeStages, normalizeGameMode } from '@/lib/gameModes';
-import type { GameState, GameMode, GameVariant, RoomSummary } from '@/types/game';
+import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 
 interface GameSession {
   gameState: GameState;
@@ -23,12 +23,14 @@ function createNewGame(
 ): GameState {
   const cfg = VARIANTS[variant];
   if (!cfg) throw new Error(`Unknown variant: ${variant}`);
-  const mode = normalizeGameMode(DEFAULT_GAME_MODE);
+  const mode = BUILT_IN_GAME_MODES[0].id;
   const stage = getActiveStage(mode, 0) ?? 'single-row';
   return {
     sessionId,
     roomName,
     variant,
+    gameModeId: mode,
+    customGameModes: [],
     mode,
     selectedMode: mode,
     gameMode: mode,
@@ -48,20 +50,20 @@ function createNewGame(
   };
 }
 
-function resolveRoomMode(session: GameState): GameMode {
-  if (session.variant !== '75-ball') return 'single-row';
-  return normalizeGameMode(session.mode ?? session.gameMode ?? session.selectedMode ?? DEFAULT_GAME_MODE);
+function getStages(session: GameState) {
+  return session.variant === '75-ball'
+    ? getGameModeStages(session.gameModeId, session.customGameModes)
+    : getGameModeStages('single-row');
 }
 
-function syncStageState(session: GameState, mode: GameMode = resolveRoomMode(session), stageIndex = session.stageIndex ?? 0) {
-  const normalizedMode = normalizeGameMode(mode);
-  const stages = getGameModeStages(normalizedMode);
+function syncStageState(session: GameState, stageIndex = session.stageIndex ?? 0) {
+  const stages = getStages(session);
   const safeIndex = Math.max(0, Math.min(stageIndex, Math.max(0, stages.length - 1)));
-  const currentStage = getActiveStage(normalizedMode, safeIndex) ?? 'single-row';
+  const currentStage = stages[safeIndex] ?? 'single-row';
 
-  session.mode = normalizedMode;
-  session.selectedMode = normalizedMode;
-  session.gameMode = normalizedMode;
+  session.mode = session.gameModeId;
+  session.selectedMode = session.gameModeId;
+  session.gameMode = session.gameModeId;
   session.stageIndex = safeIndex;
   session.currentStageIndex = safeIndex;
   session.activeStageIndex = safeIndex;
@@ -151,7 +153,17 @@ function undoLastDraw(session: GameState, expectedNumber?: number): GameActionRe
 }
 
 function handleGameAction(
-  parsed: { action: string; sessionId?: string; roomName?: string; variant?: GameVariant; number?: number; claimedNumbers?: number[] },
+  parsed: {
+    action: string;
+    sessionId?: string;
+    roomName?: string;
+    variant?: GameVariant;
+    number?: number;
+    claimedNumbers?: number[];
+    gameModeId?: string;
+    gameModeName?: unknown;
+    patterns?: unknown;
+  },
 ): GameActionResult {
   if (parsed.action === 'create-session') return createSession(parsed.roomName);
 
@@ -160,6 +172,36 @@ function handleGameAction(
   if (!sessionData) return null;
 
   if (parsed.action === 'undo-last-draw') return undoLastDraw(session, parsed.number);
+
+  if (parsed.action === 'create-game-mode') {
+    if (session.variant !== '75-ball') return { error: 'Game modes are only available for 75-ball games.' };
+    if (session.status !== 'waiting') return { error: 'Reset the game before changing its game mode.' };
+
+    const result = createCustomGameMode(
+      parsed.gameModeName,
+      parsed.patterns,
+      [...BUILT_IN_GAME_MODES, ...session.customGameModes],
+    );
+    if ('error' in result) return result;
+
+    session.customGameModes.push(result.mode);
+    session.gameModeId = result.mode.id;
+    syncStageState(session, 0);
+    return { ...session };
+  }
+
+  if (parsed.action === 'select-game-mode') {
+    if (session.variant !== '75-ball') return { error: 'Game modes are only available for 75-ball games.' };
+    if (session.status !== 'waiting') return { error: 'Reset the game before changing its game mode.' };
+    if (typeof parsed.gameModeId !== 'string') return { error: 'Select an available game mode.' };
+    const modeExists = [...BUILT_IN_GAME_MODES, ...session.customGameModes]
+      .some((mode) => mode.id === parsed.gameModeId);
+    if (!modeExists) return { error: 'Select an available game mode.' };
+
+    session.gameModeId = parsed.gameModeId;
+    syncStageState(session, 0);
+    return { ...session };
+  }
 
   if (parsed.action === 'draw' && session.drawMode === 'manual') {
     return { error: 'Draw mode is locked to manual calls. Reset the game to switch to automatic drawing.' };
@@ -193,8 +235,8 @@ function handleGameAction(
   }
 
   if (parsed.action === 'verify-bingo') {
-    const currentMode = resolveRoomMode(session);
-    const activeStage = getActiveStage(currentMode, session.stageIndex ?? 0) ?? 'single-row';
+    const stages = getStages(session);
+    const activeStage = stages[Math.min(session.stageIndex ?? 0, stages.length - 1)] ?? 'single-row';
     const verification = verifyBingoNumbers(
       parsed.claimedNumbers ?? [],
       session.drawnNumbers,
@@ -208,8 +250,8 @@ function handleGameAction(
       return { ...session };
     }
 
-    const nextStageState = advanceGameModeStage(currentMode, session.stageIndex ?? 0);
-    syncStageState(session, currentMode, nextStageState.currentStageIndex);
+    const nextStageState = advanceGameModeStage(session.gameModeId, session.stageIndex ?? 0, session.customGameModes);
+    syncStageState(session, nextStageState.currentStageIndex);
     session.completedStages = Array.from(new Set([
       ...session.completedStages,
       activeStage,
@@ -219,8 +261,10 @@ function handleGameAction(
   }
 
   if (parsed.action === 'reset') {
-    const resetGame = createNewGame(session.variant, session.sessionId);
-    syncStageState(resetGame, DEFAULT_GAME_MODE, 0);
+    const resetGame = createNewGame(session.variant, session.sessionId, session.roomName);
+    resetGame.gameModeId = session.gameModeId;
+    resetGame.customGameModes = session.customGameModes;
+    syncStageState(resetGame, 0);
     gameSessions.set(session.sessionId, {
       gameState: resetGame,
       allNumbers: generateAllNumbers(VARIANTS[resetGame.variant].maxNumber),
@@ -236,8 +280,8 @@ function handleGameAction(
     session.status = 'waiting';
     session.drawMode = null;
     session.verifiedBingo = null;
-    const nextMode = parsed.variant === '75-ball' ? normalizeGameMode(session.mode ?? session.gameMode ?? session.selectedMode ?? DEFAULT_GAME_MODE) : 'single-row';
-    syncStageState(session, nextMode, 0);
+    session.completedStages = [];
+    syncStageState(session, 0);
     gameSessions.set(session.sessionId, {
       gameState: session,
       allNumbers: generateAllNumbers(VARIANTS[parsed.variant].maxNumber),
@@ -259,6 +303,9 @@ wss.on('connection', (ws: WebSocket) => {
       variant?: GameVariant;
       number?: number;
       claimedNumbers?: number[];
+      gameModeId?: string;
+      gameModeName?: unknown;
+      patterns?: unknown;
     };
     try {
       parsed = JSON.parse(data.toString());

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import WebSocket, { type RawData } from 'ws';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
+import { BUILT_IN_GAME_MODES, createCustomGameMode } from '@/lib/gameModes';
 import { normalizeRoomId } from '@/lib/gameRoom';
 import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 
@@ -31,12 +32,15 @@ function parseResponseText(data: RawData): string {
 
 function requestGameState(
   message: {
-    action: 'create-session' | 'draw' | 'call-number' | 'undo-last-draw' | 'reset' | 'change-variant' | 'verify-bingo' | 'ping';
+    action: 'create-session' | 'draw' | 'call-number' | 'undo-last-draw' | 'reset' | 'change-variant' | 'verify-bingo' | 'select-game-mode' | 'create-game-mode' | 'ping';
     sessionId?: string;
     roomName?: string;
     variant?: GameVariant;
     number?: number;
     claimedNumbers?: number[];
+    gameModeId?: string;
+    gameModeName?: unknown;
+    patterns?: unknown;
   },
 ): Promise<GameState> {
   return new Promise((resolve, reject) => {
@@ -84,12 +88,15 @@ function requestSessions(): Promise<RoomSummary[]> {
 // POST /api/game — Handles draw and reset actions
 export async function POST(req: NextRequest) {
   let body: {
-    action: 'create-session' | 'draw' | 'call-number' | 'undo-last-draw' | 'reset' | 'change-variant' | 'verify-bingo';
+    action: 'create-session' | 'draw' | 'call-number' | 'undo-last-draw' | 'reset' | 'change-variant' | 'verify-bingo' | 'select-game-mode' | 'create-game-mode';
     sessionId?: string;
     roomName?: string;
     variant?: GameVariant;
     number?: number;
     claimedNumbers?: number[];
+    gameModeId?: string;
+    gameModeName?: unknown;
+    patterns?: unknown;
   };
 
   try {
@@ -98,14 +105,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
   }
 
-  const { action, roomName, variant, number, claimedNumbers } = body;
+  const { action, roomName, variant, number, claimedNumbers, gameModeId, gameModeName, patterns } = body;
   const sessionId = normalizeRoomId(body.sessionId);
 
-  if (!['create-session', 'draw', 'call-number', 'undo-last-draw', 'reset', 'change-variant', 'verify-bingo'].includes(action)) {
+  if (!['create-session', 'draw', 'call-number', 'undo-last-draw', 'reset', 'change-variant', 'verify-bingo', 'select-game-mode', 'create-game-mode'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   }
   if (action === 'change-variant' && (!variant || !VARIANTS[variant])) {
     return NextResponse.json({ error: 'Unknown variant' }, { status: 400 });
+  }
+  if (action === 'select-game-mode' && typeof gameModeId !== 'string') {
+    return NextResponse.json({ error: 'Select an available game mode.' }, { status: 400 });
+  }
+  if (action === 'create-game-mode') {
+    const validation = createCustomGameMode(gameModeName, patterns, BUILT_IN_GAME_MODES);
+    if ('error' in validation) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
   }
 
   try {
@@ -140,7 +156,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const gameState = await requestGameState({ action, sessionId, roomName, variant, number, claimedNumbers });
+    const gameState = await requestGameState({
+      action,
+      sessionId,
+      roomName,
+      variant,
+      number,
+      claimedNumbers,
+      gameModeId,
+      gameModeName,
+      patterns,
+    });
     return NextResponse.json({ gameState });
   } catch (error) {
     if (error instanceof GameActionRejectedError) {

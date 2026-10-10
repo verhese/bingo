@@ -7,6 +7,7 @@ Bingo is an accessibility-focused web app for community bingo sessions. It gives
 - Large live caller display and responsive drawn-number board.
 - Independent named game rooms using a `room` query parameter.
 - 90-ball, 75-ball, and Speedy Bingo variants.
+- Built-in Single Row and Standard game modes, plus room-local custom 75-ball modes with reorderable stages.
 - Random draws, validated manual calls, resets, variant changes, and five-number Bingo-claim verification.
 - Live room-scoped updates over WebSocket.
 - High-contrast light theme, persisted dark-theme option, and keyboard caller controls.
@@ -47,7 +48,7 @@ Use the same `room` value in the game room and admin URLs to share a session, fo
 | `npm run start:ws` | Start the WebSocket game service. |
 | `npm run lint` | Run ESLint across the project. |
 
-Automated test scripts are not configured yet.
+Run `npm test` to execute the Bingo-claim and game-mode unit tests.
 
 ## Docker deployment
 
