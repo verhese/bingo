@@ -114,16 +114,24 @@ export async function POST(req: NextRequest) {
   if (action === 'change-variant' && (!variant || !VARIANTS[variant])) {
     return NextResponse.json({ error: 'Unknown variant' }, { status: 400 });
   }
-  if (action === 'select-game-mode' && typeof gameModeId !== 'string') {
-    return NextResponse.json({ error: 'Select an available game mode.' }, { status: 400 });
-  }
-  if (action === 'create-game-mode') {
-    const validation = createCustomGameMode(gameModeName, patterns, BUILT_IN_GAME_MODES);
-    if ('error' in validation) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
+  if (action === 'create-session') {
+    if (
+      gameModeId !== undefined
+      && (typeof gameModeId !== 'string'
+        || (gameModeId !== 'custom' && !BUILT_IN_GAME_MODES.some((mode) => mode.id === gameModeId)))
+    ) {
+      return NextResponse.json({ error: 'Select an available game mode for the new room.' }, { status: 400 });
+    }
+    if (gameModeId === 'custom') {
+      const validation = createCustomGameMode(gameModeName, patterns, BUILT_IN_GAME_MODES);
+      if ('error' in validation) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
     }
   }
-
+  if (action === 'select-game-mode' || action === 'create-game-mode') {
+    return NextResponse.json({ error: 'A room game mode is fixed when the room is created.' }, { status: 409 });
+  }
   try {
     if (action === 'call-number') {
       const currentState = await requestGameState({ action: 'ping', sessionId });
@@ -150,6 +158,7 @@ export async function POST(req: NextRequest) {
         Array.isArray(claimedNumbers) ? claimedNumbers : [],
         currentState.drawnNumbers,
         currentState.variant,
+        currentState.variant === '75-ball' ? currentState.currentStage : 'single-row',
       );
       if (!verification.isVerified) {
         return NextResponse.json({ error: 'The claimed line cannot be verified' }, { status: 400 });

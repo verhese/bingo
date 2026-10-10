@@ -87,4 +87,10 @@ describe('Bingo pattern validation', () => {
   it('keeps existing five-number claims compatible by default', () => {
     assert.equal(verifyBingoNumbers([1, 2, 3, 4, 5], [1, 2, 3, 4, 5], '75-ball').isVerified, true);
   });
-});
+
+      it('requires eight numbers for the cross', () => {
+        const eight = [1, 2, 3, 4, 5, 6, 7, 8];
+        assert.equal(verifyBingoNumbers(eight, eight, '75-ball', 'sint-andreas-cross').isVerified, true);
+        assert.equal(verifyBingoNumbers(eight.slice(0, 5), eight, '75-ball', 'sint-andreas-cross').isVerified, false);
+      });
+    });

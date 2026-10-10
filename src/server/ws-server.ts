@@ -20,20 +20,21 @@ function createNewGame(
   variant: GameVariant = '75-ball',
   sessionId = DEFAULT_ROOM_ID,
   roomName = sessionId,
+  gameModeId = BUILT_IN_GAME_MODES[0].id,
+  customGameModes: GameState['customGameModes'] = [],
 ): GameState {
   const cfg = VARIANTS[variant];
   if (!cfg) throw new Error(`Unknown variant: ${variant}`);
-  const mode = BUILT_IN_GAME_MODES[0].id;
-  const stage = getActiveStage(mode, 0) ?? 'single-row';
+  const stage = getActiveStage(gameModeId, 0, customGameModes) ?? 'single-row';
   return {
     sessionId,
     roomName,
     variant,
-    gameModeId: mode,
-    customGameModes: [],
-    mode,
-    selectedMode: mode,
-    gameMode: mode,
+    gameModeId,
+    customGameModes,
+    mode: gameModeId,
+    selectedMode: gameModeId,
+    gameMode: gameModeId,
     stageIndex: 0,
     currentStageIndex: 0,
     activeStageIndex: 0,
@@ -86,7 +87,23 @@ function getOrCreateSession(sessionId?: string): GameState {
   return newGame;
 }
 
-function createSession(roomName?: string): GameState {
+function createSession(
+  roomName?: string,
+  gameModeId = BUILT_IN_GAME_MODES[0].id,
+  gameModeName?: unknown,
+  patterns?: unknown,
+): GameActionResult {
+  let selectedGameModeId = gameModeId;
+  let customGameModes: GameState['customGameModes'] = [];
+  if (gameModeId === 'custom') {
+    const result = createCustomGameMode(gameModeName, patterns, BUILT_IN_GAME_MODES);
+    if ('error' in result) return result;
+    customGameModes = [result.mode];
+    selectedGameModeId = result.mode.id;
+  } else if (!BUILT_IN_GAME_MODES.some((mode) => mode.id === gameModeId)) {
+    return { error: 'Select an available game mode for the new room.' };
+  }
+
   const normalizedRoomName = normalizeRoomName(roomName);
   const baseId = normalizeRoomId(normalizedRoomName.replace(/\s+/g, '-'));
   let sessionId = baseId === DEFAULT_ROOM_ID ? `room-${Date.now()}` : baseId;
@@ -95,7 +112,7 @@ function createSession(roomName?: string): GameState {
     sessionId = `${baseId}-${suffix}`;
     suffix += 1;
   }
-  const gameState = createNewGame('75-ball', sessionId, normalizedRoomName);
+  const gameState = createNewGame('75-ball', sessionId, normalizedRoomName, selectedGameModeId, customGameModes);
   gameSessions.set(sessionId, {
     gameState,
     allNumbers: generateAllNumbers(VARIANTS[gameState.variant].maxNumber),
@@ -165,7 +182,9 @@ function handleGameAction(
     patterns?: unknown;
   },
 ): GameActionResult {
-  if (parsed.action === 'create-session') return createSession(parsed.roomName);
+  if (parsed.action === 'create-session') {
+    return createSession(parsed.roomName, parsed.gameModeId, parsed.gameModeName, parsed.patterns);
+  }
 
   const session = getOrCreateSession(parsed.sessionId);
   const sessionData = gameSessions.get(session.sessionId);
@@ -174,33 +193,11 @@ function handleGameAction(
   if (parsed.action === 'undo-last-draw') return undoLastDraw(session, parsed.number);
 
   if (parsed.action === 'create-game-mode') {
-    if (session.variant !== '75-ball') return { error: 'Game modes are only available for 75-ball games.' };
-    if (session.status !== 'waiting') return { error: 'Reset the game before changing its game mode.' };
-
-    const result = createCustomGameMode(
-      parsed.gameModeName,
-      parsed.patterns,
-      [...BUILT_IN_GAME_MODES, ...session.customGameModes],
-    );
-    if ('error' in result) return result;
-
-    session.customGameModes.push(result.mode);
-    session.gameModeId = result.mode.id;
-    syncStageState(session, 0);
-    return { ...session };
+    return { error: 'Custom game modes must be configured when creating a room.' };
   }
 
   if (parsed.action === 'select-game-mode') {
-    if (session.variant !== '75-ball') return { error: 'Game modes are only available for 75-ball games.' };
-    if (session.status !== 'waiting') return { error: 'Reset the game before changing its game mode.' };
-    if (typeof parsed.gameModeId !== 'string') return { error: 'Select an available game mode.' };
-    const modeExists = [...BUILT_IN_GAME_MODES, ...session.customGameModes]
-      .some((mode) => mode.id === parsed.gameModeId);
-    if (!modeExists) return { error: 'Select an available game mode.' };
-
-    session.gameModeId = parsed.gameModeId;
-    syncStageState(session, 0);
-    return { ...session };
+    return { error: 'A room game mode is fixed when the room is created.' };
   }
 
   if (parsed.action === 'draw' && session.drawMode === 'manual') {

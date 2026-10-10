@@ -16,13 +16,12 @@ export function Board({ maxNumber, drawnNumbers, undoneNumbers = [], verifiedBin
   return (
     <section className="bingo-board-section" aria-label="Called bingo numbers">
       <div className="bingo-board-header">
-        {verifiedBingo && (
+        {verifiedBingo ? (
           <div className="bingo-announcement" role="alert">
             <strong>BINGO!</strong>
-            <span>Verified winning line: {verifiedBingo.join(', ')}</span>
+            <span>{verifiedBingo.join(', ')}</span>
           </div>
-        )}
-        {stageStatus}
+        ) : stageStatus}
       </div>
       <div className={`bingo-board ${layoutClass}`}>
         {Array.from({ length: maxNumber }, (_, i) => i + 1).map((n) => {

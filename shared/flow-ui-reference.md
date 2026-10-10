@@ -25,7 +25,7 @@ The caller UI provides:
 - A red Undo Last Call control beside Call Number in manual mode, with an inline confirmation naming the latest call. Undo removes that call from history and the caller display, while the game board marks the number with a red X until it is called again.
 - The first accepted call locks the room to automatic or manual drawing; the opposing control and automatic-draw `Space` shortcut are disabled until reset or variant change. The locked mode is shown in the caller panel.
 - `Space` to draw and `R` to reset unless focus is in an input or select; `Escape` closes the Bingo dialog.
-- A five-field Bingo-verification dialog that reports wrong count, invalid/repeated values, and numbers not yet called before submitting a valid claim.
+- A Bingo-verification dialog with one field per number required by the active stage (e.g. 8 for the cross) that reports wrong count, invalid/repeated values, and numbers not yet called before submitting a valid claim.
 - A dismissible service-error alert for failed caller actions.
 
 There is no sign-in or other authorization behavior at this time.

@@ -9,7 +9,7 @@ import { VariantSelector } from '@/components/VariantSelector';
 import { GameStageStatus } from '@/components/GameStageStatus';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoClaim, type BingoClaimResult } from '@/lib/bingoClaim';
-import { BINGO_PATTERNS, type BingoPattern } from '@/lib/bingoPatterns';
+import { BINGO_PATTERNS, getBingoPatternNumberCounts, type BingoPattern } from '@/lib/bingoPatterns';
 import { BUILT_IN_GAME_MODES } from '@/lib/gameModes';
 import { normalizeRoomId } from '@/lib/gameRoom';
 import type { GameState, GameVariant, RoomSummary } from '@/types/game';
@@ -24,6 +24,7 @@ function AdminPanel() {
   const [variant, setVariant] = useState<GameVariant>('75-ball');
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [newRoomName, setNewRoomName] = useState('');
+  const [newRoomGameModeId, setNewRoomGameModeId] = useState(BUILT_IN_GAME_MODES[0].id);
   const [manualNumber, setManualNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [claimNumbers, setClaimNumbers] = useState(['', '', '', '', '']);
@@ -38,14 +39,16 @@ function AdminPanel() {
     drawNumber,
     callNumber,
     undoLastCall,
-    selectGameMode,
-    createGameMode,
     state,
   } = useGameSession(WS_URL, roomId);
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
   const drawMode = state?.drawMode ?? null;
   const autoDrawLocked = drawMode === 'manual';
   const manualCallLocked = drawMode === 'auto';
+  const claimPattern: BingoPattern = state?.variant === '75-ball' ? state.currentStage : 'single-row';
+  const claimCounts = getBingoPatternNumberCounts(claimPattern);
+  const claimFieldCount = claimCounts[claimCounts.length - 1];
+  const claimMinimum = claimCounts[0];
   const lastCall = state?.drawnNumbers.at(-1);
   const canUndo = drawMode === 'manual' && state?.status === 'in-play' && lastCall !== undefined;
 
@@ -73,15 +76,27 @@ function AdminPanel() {
     if (drawMode !== 'manual') setUndoConfirmation(false);
   }, [drawMode]);
 
+  useEffect(() => {
+    setClaimNumbers(Array.from({ length: claimFieldCount }, () => ''));
+  }, [claimFieldCount, claimPattern]);
+
   const handleCreateRoom = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
       const response = await fetch('/api/game', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create-session', roomName: newRoomName }),
+        body: JSON.stringify({
+          action: 'create-session',
+          roomName: newRoomName,
+          gameModeId: newRoomGameModeId,
+          ...(newRoomGameModeId === 'custom' ? { gameModeName, patterns: selectedPatterns } : {}),
+        }),
       });
-      if (!response.ok) throw new Error('Unable to create the room');
+      if (!response.ok) {
+        const result = (await response.json()) as { error?: string };
+        throw new Error(result.error ?? 'Unable to create the room');
+      }
       const result = (await response.json()) as { gameState: GameState };
       setRooms((currentRooms) => [
         ...currentRooms.filter((room) => room.sessionId !== result.gameState.sessionId),
@@ -94,6 +109,9 @@ function AdminPanel() {
         },
       ].sort((first, second) => first.roomName.localeCompare(second.roomName)));
       setNewRoomName('');
+      setNewRoomGameModeId(BUILT_IN_GAME_MODES[0].id);
+      setGameModeName('');
+      setSelectedPatterns([]);
       router.push(`/admin-panel?room=${encodeURIComponent(result.gameState.sessionId)}`);
     } catch (createError) {
       setServiceError(createError instanceof Error ? createError.message : 'Unable to create the room');
@@ -117,27 +135,6 @@ function AdminPanel() {
       setVariant(newVariant);
     } catch (variantError) {
       setServiceError(variantError instanceof Error ? variantError.message : 'Unable to change the game variant');
-    }
-  };
-
-  const handleGameModeChange = async (gameModeId: string) => {
-    setServiceError(null);
-    try {
-      await selectGameMode(gameModeId);
-    } catch (modeError) {
-      setServiceError(modeError instanceof Error ? modeError.message : 'Unable to select the game mode');
-    }
-  };
-
-  const handleCreateGameMode = async (event: React.SyntheticEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setServiceError(null);
-    try {
-      await createGameMode(gameModeName, selectedPatterns);
-      setGameModeName('');
-      setSelectedPatterns([]);
-    } catch (modeError) {
-      setServiceError(modeError instanceof Error ? modeError.message : 'Unable to create the game mode');
     }
   };
 
@@ -214,7 +211,7 @@ function AdminPanel() {
   const handleClaimVerification = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     setClaimError(null);
-    const verification = verifyBingoClaim(claimNumbers.join(','), state?.drawnNumbers ?? [], state?.variant ?? variant);
+    const verification = verifyBingoClaim(claimNumbers.join(','), state?.drawnNumbers ?? [], state?.variant ?? variant, claimPattern);
     if (!verification.isVerified) {
       setClaimResult(verification);
       return;
@@ -304,10 +301,90 @@ function AdminPanel() {
               Open Game Room
             </a>
           </div>
-          <form onSubmit={handleCreateRoom} className="flex flex-wrap items-center gap-3">
-            <label htmlFor="new-room-name" className="font-bold text-bingo-text">New room</label>
-            <input id="new-room-name" type="text" value={newRoomName} onChange={(event) => setNewRoomName(event.target.value)} maxLength={40} className="w-56 rounded border-2 border-bingo-muted bg-bingo-surface px-4 py-3 text-xl font-bold text-bingo-text" required />
-            <button type="submit" className="rounded-lg bg-bingo-accent px-5 py-3 text-lg font-bold text-bingo-bg hover:opacity-90">Create Room</button>
+          <form onSubmit={handleCreateRoom} className="flex flex-col gap-3 rounded-lg border-2 border-bingo-muted bg-bingo-surface p-4">
+            <h2 className="text-xl font-bold text-bingo-text">Create a new room</h2>
+            <label htmlFor="new-room-name" className="font-bold text-bingo-text">Room name</label>
+            <input id="new-room-name" type="text" value={newRoomName} onChange={(event) => setNewRoomName(event.target.value)} maxLength={40} className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text" required />
+            <label htmlFor="new-room-game-mode" className="font-bold text-bingo-text">Room game mode</label>
+            <select
+              id="new-room-game-mode"
+              value={newRoomGameModeId}
+              onChange={(event) => setNewRoomGameModeId(event.target.value)}
+              className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text"
+            >
+              {BUILT_IN_GAME_MODES.map((mode) => (
+                <option key={mode.id} value={mode.id}>{mode.name}</option>
+              ))}
+              <option value="custom">Custom mode</option>
+            </select>
+            {newRoomGameModeId === 'custom' && (
+              <>
+                <label htmlFor="new-room-game-mode-name" className="font-bold text-bingo-text">Custom mode name</label>
+                <input
+                  id="new-room-game-mode-name"
+                  type="text"
+                  value={gameModeName}
+                  onChange={(event) => setGameModeName(event.target.value)}
+                  maxLength={40}
+                  required
+                  className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text"
+                />
+                <fieldset className="flex flex-col gap-2">
+                  <legend className="mb-1 font-bold text-bingo-text">Patterns (in stage order)</legend>
+                  {Object.keys(BINGO_PATTERNS).map((pattern) => {
+                    const typedPattern = pattern as BingoPattern;
+                    return (
+                      <label key={pattern} className="flex items-center gap-2 text-bingo-text">
+                        <input
+                          type="checkbox"
+                          checked={selectedPatterns.includes(typedPattern)}
+                          onChange={() => togglePattern(typedPattern)}
+                          className="h-5 w-5 accent-bingo-accent"
+                        />
+                        {BINGO_PATTERNS[typedPattern].name}
+                      </label>
+                    );
+                  })}
+                </fieldset>
+                {selectedPatterns.length > 0 && (
+                  <ol aria-label="Custom mode stage order" className="flex flex-col gap-2">
+                    {selectedPatterns.map((pattern, index) => (
+                      <li key={pattern} className="flex items-center justify-between gap-3 rounded border border-bingo-muted bg-bingo-bg px-3 py-2 text-bingo-text">
+                        <span>{index + 1}. {BINGO_PATTERNS[pattern].name}</span>
+                        <span className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => movePattern(index, -1)}
+                            disabled={index === 0}
+                            aria-label={`Move ${BINGO_PATTERNS[pattern].name} earlier`}
+                            className="rounded border border-bingo-muted px-3 py-1 disabled:opacity-40"
+                          >
+                            Up
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => movePattern(index, 1)}
+                            disabled={index === selectedPatterns.length - 1}
+                            aria-label={`Move ${BINGO_PATTERNS[pattern].name} later`}
+                            className="rounded border border-bingo-muted px-3 py-1 disabled:opacity-40"
+                          >
+                            Down
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </>
+            )}
+            <p className="text-sm text-bingo-muted">The game mode is fixed for the lifetime of the room.</p>
+            <button
+              type="submit"
+              disabled={newRoomGameModeId === 'custom' && selectedPatterns.length === 0}
+              className="self-start rounded-lg bg-bingo-accent px-5 py-3 text-lg font-bold text-bingo-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Create Room
+            </button>
           </form>
         </section>
         <RecentCalls drawnNumbers={state?.drawnNumbers ?? []} />
@@ -320,97 +397,12 @@ function AdminPanel() {
         {(state?.variant ?? variant) === '75-ball' && (
           <section className="flex flex-col gap-3 rounded-lg border-2 border-bingo-muted bg-bingo-surface p-4">
             <h2 className="text-xl font-bold text-bingo-text">75-ball game mode</h2>
-            <label htmlFor="game-mode" className="font-bold text-bingo-text">Select game mode</label>
-            <select
-              id="game-mode"
-              value={state?.gameModeId ?? BUILT_IN_GAME_MODES[0].id}
-              disabled={state?.status !== 'waiting'}
-              onChange={(event) => void handleGameModeChange(event.target.value)}
-              className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text disabled:opacity-50"
-            >
-              <optgroup label="Built-in modes">
-                {BUILT_IN_GAME_MODES.map((mode) => (
-                  <option key={mode.id} value={mode.id}>{mode.name}</option>
-                ))}
-              </optgroup>
-              {(state?.customGameModes.length ?? 0) > 0 && (
-                <optgroup label="Room custom modes">
-                  {state?.customGameModes.map((mode) => (
-                    <option key={mode.id} value={mode.id}>{mode.name}</option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-            {state?.status !== 'waiting' && (
-              <p className="text-sm text-bingo-muted">Reset the game to change its mode.</p>
-            )}
-            <form onSubmit={handleCreateGameMode} className="flex flex-col gap-3 border-t border-bingo-muted pt-3">
-              <h3 className="font-bold text-bingo-text">Create a custom mode</h3>
-              <label htmlFor="game-mode-name" className="font-bold text-bingo-text">Mode name</label>
-              <input
-                id="game-mode-name"
-                type="text"
-                value={gameModeName}
-                onChange={(event) => setGameModeName(event.target.value)}
-                maxLength={40}
-                required
-                disabled={state?.status !== 'waiting'}
-                className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text disabled:opacity-50"
-              />
-              <fieldset disabled={state?.status !== 'waiting'} className="flex flex-col gap-2">
-                <legend className="mb-1 font-bold text-bingo-text">Patterns</legend>
-                {Object.keys(BINGO_PATTERNS).map((pattern) => {
-                  const typedPattern = pattern as BingoPattern;
-                  return (
-                    <label key={pattern} className="flex items-center gap-2 text-bingo-text">
-                      <input
-                        type="checkbox"
-                        checked={selectedPatterns.includes(typedPattern)}
-                        onChange={() => togglePattern(typedPattern)}
-                        className="h-5 w-5 accent-bingo-accent"
-                      />
-                      {BINGO_PATTERNS[typedPattern].name}
-                    </label>
-                  );
-                })}
-              </fieldset>
-              {selectedPatterns.length > 0 && (
-                <ol aria-label="Custom mode stage order" className="flex flex-col gap-2">
-                  {selectedPatterns.map((pattern, index) => (
-                    <li key={pattern} className="flex items-center justify-between gap-3 rounded border border-bingo-muted bg-bingo-bg px-3 py-2 text-bingo-text">
-                      <span>{index + 1}. {BINGO_PATTERNS[pattern].name}</span>
-                      <span className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => movePattern(index, -1)}
-                          disabled={state?.status !== 'waiting' || index === 0}
-                          aria-label={`Move ${BINGO_PATTERNS[pattern].name} earlier`}
-                          className="rounded border border-bingo-muted px-3 py-1 disabled:opacity-40"
-                        >
-                          Up
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => movePattern(index, 1)}
-                          disabled={state?.status !== 'waiting' || index === selectedPatterns.length - 1}
-                          aria-label={`Move ${BINGO_PATTERNS[pattern].name} later`}
-                          className="rounded border border-bingo-muted px-3 py-1 disabled:opacity-40"
-                        >
-                          Down
-                        </button>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-              <button
-                type="submit"
-                disabled={state?.status !== 'waiting' || selectedPatterns.length === 0}
-                className="self-start rounded-lg bg-bingo-accent px-5 py-3 text-lg font-bold text-bingo-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Save and select mode
-              </button>
-            </form>
+            <p className="text-bingo-text">
+              {state?.customGameModes.find((mode) => mode.id === state.gameModeId)?.name
+                ?? BUILT_IN_GAME_MODES.find((mode) => mode.id === state?.gameModeId)?.name
+                ?? state?.gameModeId}
+              {' — '}fixed when this room was created.
+            </p>
           </section>
         )}
         <form onSubmit={handleManualCall} className="flex flex-col gap-3">
@@ -503,7 +495,7 @@ function AdminPanel() {
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 id="verify-bingo-title" className="text-3xl font-bold text-bingo-text">Verify a Bingo call</h2>
-                <p id="verify-bingo-description" className="mt-1 text-lg text-bingo-muted">Enter the five numbers in the claimed winning line.</p>
+                <p id="verify-bingo-description" className="mt-1 text-lg text-bingo-muted">Enter the {claimCounts.join(' or ')} numbers on the card for the claimed {BINGO_PATTERNS[claimPattern].name} (the free centre space is not counted).</p>
               </div>
               <button
                 type="button"
@@ -517,8 +509,8 @@ function AdminPanel() {
             </div>
             <form onSubmit={handleClaimVerification} className="flex flex-col gap-4">
               <fieldset>
-                <legend className="mb-2 font-bold text-bingo-text">Winning line numbers</legend>
-                <div className="grid grid-cols-5 gap-3">
+                <legend className="mb-2 font-bold text-bingo-text">Winning numbers ({BINGO_PATTERNS[claimPattern].name})</legend>
+                <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(4.5rem, 1fr))' }}>
                   {claimNumbers.map((number, index) => (
                     <input
                       key={index}
@@ -536,9 +528,9 @@ function AdminPanel() {
                         setClaimResult(null);
                         setClaimError(null);
                       }}
-                      aria-label={`Winning line number ${index + 1}`}
+                      aria-label={`Winning number ${index + 1}`}
                       className="min-w-0 rounded-lg border-2 border-bingo-muted bg-bingo-bg px-2 py-3 text-center text-xl font-bold text-bingo-text"
-                      required
+                      required={index < claimMinimum}
                     />
                   ))}
                 </div>
@@ -568,7 +560,9 @@ function AdminPanel() {
                   ) : (
                     <div className="space-y-1">
                       <p className="font-bold text-bingo-danger">This call cannot be verified yet.</p>
-                      {claimResult.claimedNumbers.length !== 5 && <p>Enter exactly five numbers from one winning line.</p>}
+                      {!claimResult.requiredNumberCounts.includes(claimResult.claimedNumbers.length) && (
+                        <p>Enter exactly {claimResult.requiredNumberCounts.join(' or ')} numbers for the {BINGO_PATTERNS[claimPattern].name}.</p>
+                      )}
                       {claimResult.invalidNumbers.length > 0 && <p>Invalid or repeated numbers: {claimResult.invalidNumbers.join(', ')}.</p>}
                       {claimResult.missingNumbers.length > 0 && <p>Not called: {claimResult.missingNumbers.join(', ')}.</p>}
                     </div>

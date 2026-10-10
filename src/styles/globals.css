@@ -17,6 +17,10 @@
   --bingo-drawn: #facc15;
   --bingo-drawn-border: #713f12;
   --bingo-danger: #b91c1c;
+  --bingo-win-bg: #bbf7d0;
+  --bingo-win-border: #15803d;
+  --bingo-win-text: #14532d;
+  --bingo-win-accent: #166534;
 }
 
 :root[data-theme='dark'] {
@@ -36,6 +40,10 @@
   --bingo-drawn: #ffd23f;
   --bingo-drawn-border: #fff1a8;
   --bingo-danger: #fca5a5;
+  --bingo-win-bg: #166534;
+  --bingo-win-border: #bbf7d0;
+  --bingo-win-text: #ffffff;
+  --bingo-win-accent: #fef08a;
 }
 
 @theme {
@@ -61,15 +69,16 @@ body {
 .game-room {
   box-sizing: border-box;
   display: grid;
-  grid-template-rows: auto minmax(14rem, 1fr) minmax(18rem, 1.15fr);
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1.15fr);
   gap: clamp(0.75rem, 1.6vw, 1.5rem);
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   padding: clamp(0.75rem, 1.8vw, 2rem);
 }
 
 .game-session-bar {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto;
   gap: 1rem;
   align-items: center;
   padding: 1rem 1.5rem;
@@ -98,12 +107,12 @@ body {
 }
 
 .game-stage-status strong {
-  font-size: clamp(1.2rem, 2.6vw, 2.5rem);
+  font-size: clamp(1rem, min(2.6vw, 4vh), 2rem);
 }
 
 .game-stage-status span {
   color: var(--bingo-muted);
-  font-size: clamp(0.85rem, 1.2vw, 1.1rem);
+  font-size: clamp(0.8rem, min(1.2vw, 2.5vh), 1.1rem);
   font-weight: 700;
 }
 
@@ -116,7 +125,10 @@ body {
 
 .game-session-room select {
   min-width: 0;
-  max-width: 11rem;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 20rem;
+  text-overflow: ellipsis;
   padding: 0.35rem 1.75rem 0.35rem 0.5rem;
   background: var(--bingo-bg);
   border: 2px solid var(--bingo-border);
@@ -184,30 +196,41 @@ body {
 
 .bingo-announcement {
   display: flex;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  background: #166534;
-  border: 3px solid #bbf7d0;
+  gap: 0.1rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--bingo-win-bg);
+  border: 2px solid var(--bingo-win-border);
   border-radius: 8px;
-  color: #ffffff;
-  font-size: clamp(1.25rem, 2.4vw, 2.5rem);
-  font-weight: 700;
+  color: var(--bingo-win-text);
+  font-size: clamp(1.1rem, min(2.4vw, 4vh), 2.25rem);
+  font-weight: 800;
+  line-height: 1.2;
   text-align: center;
+  overflow: hidden;
 }
 
 .bingo-announcement strong {
-  color: #fef08a;
-  font-size: 1.35em;
+  color: var(--bingo-win-accent);
+  font-size: 1.6em;
+  line-height: 1;
+}
+
+.bingo-announcement span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bingo-board {
   display: grid;
   grid-template-columns: repeat(var(--board-columns), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--board-rows), minmax(2.5rem, 1fr));
+  grid-template-rows: repeat(var(--board-rows), minmax(0, 1fr));
   gap: clamp(0.35rem, 0.75vw, 0.75rem);
-  container-type: inline-size;
+  container-type: size;
   height: 100%;
   min-height: 0;
   padding: clamp(0.75rem, 1.5vw, 1.5rem);
@@ -229,7 +252,7 @@ body {
   border: 2px solid #64748b;
   border-radius: 6px;
   color: var(--bingo-text);
-  font-size: clamp(1rem, 2.5cqi, 2.25rem);
+  font-size: clamp(0.75rem, calc(55cqb / var(--board-rows)), 2rem);
   font-weight: 800;
   line-height: 1;
 }
@@ -319,9 +342,19 @@ body {
   gap: 0.5rem;
   min-height: 0;
   margin: 0;
-  padding: 0 0.25rem 0 0;
+  padding: 0 0.35rem 0 0;
   overflow-y: auto;
   list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bingo-accent) var(--bingo-bg);
+}
+
+.draw-history-list::-webkit-scrollbar { width: 0.6rem; }
+.draw-history-list::-webkit-scrollbar-track { background: var(--bingo-bg); border-radius: 999px; }
+.draw-history-list::-webkit-scrollbar-thumb {
+  background: var(--bingo-accent);
+  border: 2px solid var(--bingo-bg);
+  border-radius: 999px;
 }
 
 .draw-history-item {
@@ -358,20 +391,26 @@ body {
 }
 
 @media (max-height: 760px) {
-  .game-room { grid-template-rows: auto minmax(10rem, 0.9fr) minmax(15rem, 1.1fr); }
+  .game-room { grid-template-rows: auto minmax(0, 0.9fr) minmax(0, 1.1fr); }
   .caller-value { font-size: clamp(6rem, 23vh, 14rem); }
 }
 
 @media (max-width: 640px) {
-  .game-room { grid-template-rows: auto 11rem auto; }
+  .game-room {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    grid-template-rows: auto 11rem auto;
+  }
   .game-session-bar { grid-template-columns: 1fr; gap: 0.35rem; text-align: center; }
   .game-session-bar span:nth-child(2), .game-session-bar span:nth-child(3), .game-session-bar span:nth-child(4) { text-align: center; }
   .theme-toggle { justify-self: center; }
   .bingo-board--90 { --board-columns: 6; --board-rows: 15; }
   .bingo-board--75 { --board-columns: 6; --board-rows: 13; }
   .bingo-board--speedy { --board-columns: 4; --board-rows: 8; }
+  .bingo-board { grid-template-rows: repeat(var(--board-rows), minmax(2rem, 1fr)); }
   .bingo-announcement { flex-direction: column; gap: 0.15rem; }
-  .game-room-board-area { grid-template-columns: 1fr; grid-template-rows: minmax(18rem, 1fr) minmax(13rem, auto); }
+  .game-room-board-area { grid-template-columns: 1fr; grid-template-rows: minmax(18rem, auto) minmax(13rem, auto); }
   .draw-history { max-height: 17rem; }
 }
 

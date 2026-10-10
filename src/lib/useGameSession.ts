@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { DEFAULT_ROOM_ID } from '@/lib/gameRoom';
 import type { GameState } from '@/types/game';
-import type { BingoPattern } from '@/lib/bingoPatterns';
 
 export function useGameSession(url: string, sessionId = DEFAULT_ROOM_ID) {
   const [state, setState] = useState<GameState | null>(null);
@@ -56,23 +55,14 @@ export function useGameSession(url: string, sessionId = DEFAULT_ROOM_ID) {
     return performGameAction('undo-last-draw', number);
   };
 
-  const selectGameMode = async (gameModeId: string) => {
-    return performGameAction('select-game-mode', undefined, { gameModeId });
-  };
-
-  const createGameMode = async (gameModeName: string, patterns: BingoPattern[]) => {
-    return performGameAction('create-game-mode', undefined, { gameModeName, patterns });
-  };
-
   const performGameAction = async (
-    action: 'draw' | 'call-number' | 'undo-last-draw' | 'select-game-mode' | 'create-game-mode',
+    action: 'draw' | 'call-number' | 'undo-last-draw',
     number?: number,
-    modeDetails?: { gameModeId?: string; gameModeName?: string; patterns?: BingoPattern[] },
   ) => {
     const response = await fetch('/api/game', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, sessionId, number, ...modeDetails }),
+      body: JSON.stringify({ action, sessionId, number }),
     });
 
     if (!response.ok) {
@@ -85,5 +75,5 @@ export function useGameSession(url: string, sessionId = DEFAULT_ROOM_ID) {
   };
 
   const activeState = state?.sessionId === sessionId ? state : null;
-  return { state: activeState, connected, drawNumber, callNumber, undoLastCall, selectGameMode, createGameMode };
+  return { state: activeState, connected, drawNumber, callNumber, undoLastCall };
 }

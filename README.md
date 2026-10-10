@@ -13,6 +13,15 @@ Bingo is an accessibility-focused web app for community bingo sessions. It gives
 - High-contrast light theme, persisted dark-theme option, and keyboard caller controls.
 - Printable 75-ball and 90-ball card sets with browser print and A4 PDF download.
 
+## 75-ball game modes
+
+Choose a game mode when creating a room; that mode is fixed for the room, including after a reset. A verified Bingo claim completes the current stage and advances the game to the next one:
+
+- **Single Row** — one stage; a player wins by completing any horizontal row on their card.
+- **Standard** — four stages, in order: **Top Row**, **Bottom Row**, **Sint-Andreas Cross** (the X-shaped pattern), then **Full Card**. The game is complete when a claim for the full card is verified.
+
+When creating a room, you can also define a custom mode by selecting patterns and arranging their stage order. Custom modes belong to that room. Game modes are available for 75-ball games.
+
 ## Requirements
 
 - Node.js 18 or later

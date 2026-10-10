@@ -39,7 +39,7 @@ All HTTP actions return `503` with `{ "error": "Game service is unavailable" }` 
 ```
 
 `variant` is `90-ball`, `75-ball`, or `speedy`; their maximum numbers are 90, 75, and 30 respectively. `status` is `waiting`, `in-play`, or `complete`. `verifiedBingo` is `null` until a valid claim is accepted.
-`gameModeId` defaults to `single-row`. The built-in modes are `single-row` and `standard`; `customGameModes` lists custom modes saved in that room. Each mode has an `id`, `name`, and ordered `patterns` array. Custom modes are in-memory only and do not survive a game-service restart.
+`gameModeId` defaults to `single-row`. The built-in modes are `single-row` and `standard`; `customGameModes` lists the optional custom mode configured when the room was created. Each mode has an `id`, `name`, and ordered `patterns` array. The room's selected mode is immutable after creation, including after reset. Custom modes are in-memory only and do not survive a game-service restart.
 `mode`, `selectedMode`, and `gameMode` mirror `gameModeId`. `stageIndex`/`currentStage` identify the currently active bingo stage in the selected ordered mode; `completedStages` tracks prior stage confirmations. Reset and variant changes clear the stage state.
 `drawMode` is `null` before the first accepted call, then `auto` for random draws or `manual` for caller-entered numbers. Reset and variant changes clear the mode.
 `undoneNumbers` contains calls removed with undo; those numbers remain marked on the board until called again. Reset and variant changes clear this list.
@@ -72,15 +72,14 @@ Send JSON with one of the following actions. A successful response is always `{ 
 | `{ "action": "draw", "sessionId": "default" }` | Calls an available random number. Locks the game to automatic drawing on its first accepted call and clears a verified Bingo. |
 | `{ "action": "call-number", "sessionId": "default", "number": 42 }` | Calls one uncalled integer in the active variant range. Locks the game to manual calls on its first accepted call. |
 | `{ "action": "undo-last-draw", "sessionId": "default", "number": 42 }` | In manual mode, removes the latest call if it is still 42, marks it undone, and clears a verified Bingo. The `number` guard prevents a stale confirmation from undoing a newer call. |
-| `{ "action": "create-session", "roomName": "Main Hall" }` | Creates a 75-ball room with a normalized display name and unique ID. |
-| `{ "action": "verify-bingo", "sessionId": "default", "claimedNumbers": [12, 24, 38, 54, 69] }` | Accepts exactly five unique, drawn numbers in range and sets `verifiedBingo`. |
+| `{ "action": "create-session", "roomName": "Main Hall", "gameModeId": "standard" }` | Creates a 75-ball room with a normalized display name, unique ID, and selected built-in mode. `gameModeId` is optional and defaults to `single-row`. |
+| `{ "action": "create-session", "roomName": "Finals", "gameModeId": "custom", "gameModeName": "Finals", "patterns": ["top-row", "full-card"] }` | Creates a room with a custom mode composed of one or more unique registered patterns, in the supplied stage order. |
+| `{ "action": "verify-bingo", "sessionId": "default", "claimedNumbers": [12, 24, 38, 54, 69] }` | Accepts the unique, drawn numbers required by the active stage (5 for a row, 8 for the cross, 24 for full card; Single Row also allows 4) and sets `verifiedBingo`. |
 | `{ "action": "reset", "sessionId": "default" }` | Clears calls and draw mode and sets the status to `waiting`, retaining the variant. |
 | `{ "action": "change-variant", "sessionId": "default", "variant": "75-ball" }` | Changes the variant, clears calls and draw mode, and sets the status to `waiting`. |
-| `{ "action": "select-game-mode", "sessionId": "default", "gameModeId": "standard" }` | Selects a built-in or room-local custom mode in a waiting 75-ball room. |
-| `{ "action": "create-game-mode", "sessionId": "default", "gameModeName": "Finals", "patterns": ["top-row", "full-card"] }` | Saves and selects a custom mode with one or more unique registered patterns, in the supplied stage order. |
 
-`call-number` rejects duplicates, non-integers, and numbers outside the active range. Switching between automatic and manual calls after the first accepted call returns `409` with an `error` string; reset or variant change unlocks the game. `verify-bingo` rejects all claims other than five unique, already-drawn numbers in that range. A new number, reset, or variant change clears a previously verified Bingo.
-Game-mode changes and custom-mode creation are accepted only for 75-ball rooms in `waiting` status. Reset preserves the selected mode and saved custom modes; custom modes remain isolated to their room and are lost when the service restarts.
+`call-number` rejects duplicates, non-integers, and numbers outside the active range. Switching between automatic and manual calls after the first accepted call returns `409` with an `error` string; reset or variant change unlocks the game. `verify-bingo` rejects all claims that are not the unique, already-drawn numbers the active stage requires. A new number, reset, or variant change clears a previously verified Bingo.
+The deprecated `select-game-mode` and `create-game-mode` actions are rejected: a room's mode must be selected or configured in `create-session` and cannot be changed later. Reset preserves the selected mode and its custom definition; custom modes remain isolated to their room and are lost when the service restarts.
 `undo-last-draw` is accepted only in manual mode while the game is in play and at least one number has been called; automatic mode, an empty call history, or a stale `number` returns `409`. Undoing preserves manual mode. Calling an undone number again removes its undone marker.
 
 ## Browser WebSocket protocol
