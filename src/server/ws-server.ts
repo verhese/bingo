@@ -287,29 +287,6 @@ function handleGameAction(
     return resetGame;
   }
 
-  if (parsed.action === 'change-variant' && isGameVariant(parsed.variant)) {
-    session.variant = parsed.variant;
-    if (parsed.variant !== '75-ball') {
-      session.gameModeId = '';
-      session.customGameModes = [];
-    } else if (!session.gameModeId) {
-      session.gameModeId = DEFAULT_GAME_MODE_ID;
-    }
-    session.drawnNumbers = [];
-    session.undoneNumbers = [];
-    session.lastUndoneNumber = null;
-    session.status = 'waiting';
-    session.drawMode = null;
-    session.verifiedBingo = null;
-    session.completedStages = [];
-    syncStageState(session, 0);
-    gameSessions.set(session.sessionId, {
-      gameState: session,
-      allNumbers: generateAllNumbers(VARIANTS[parsed.variant].maxNumber),
-    });
-    return session;
-  }
-
   return null;
 }
 

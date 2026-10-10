@@ -19,7 +19,7 @@ flowchart LR
 
 | Component | Location | Responsibility |
 |---|---|---|
-| Next.js pages | `src/app/` | Renders `/game-room`, `/admin-panel`, and `/player-card`; `/` redirects to the game room. |
+| Next.js pages | `src/app/` | Renders `/game-room`, `/admin-panel`, `/admin-panel/create`, and `/player-card`; `/` redirects to the game room. |
 | HTTP game route | `src/server/api/game/route.ts` | Validates public API calls and proxies them to the WebSocket service. Re-exported at `src/app/api/game/route.ts`. |
 | Game service | `src/server/ws-server.ts` | Creates, stores, mutates, and broadcasts isolated room sessions. Listens on `WS_PORT` or `3001`. |
 | Session hook | `src/lib/useGameSession.ts` | Fetches an initial state from the HTTP API and sends a WebSocket `subscribe` message for updates. |
@@ -38,7 +38,8 @@ The service keeps sessions in a process-local `Map`. It does not use a database,
 | Route | Behavior |
 |---|---|
 | `/game-room` | Shows a selectable room, current variant/status/count, theme toggle, large caller display, number board, active 75-ball game stage and completed-stage progress, verified Bingo announcement, and full reverse-chronological draw history. |
-| `/admin-panel` | Lets callers select or create rooms, see the active 75-ball game stage and completed-stage progress, draw or manually call a number, change variant, select a built-in or configure a room-local custom 75-ball mode when creating a room, reset, verify a stage-dependent Bingo claim (4, 5, 8, or 24 numbers), and view five recent calls. `Space` draws and `R` resets outside form fields. |
+| `/admin-panel/create` | Creates a room (name, variant and, for 75-ball, game mode) and redirects to that room's game control; Cancel returns to the lobby. |
+| `/admin-panel?room=<id>` | Game control for one room, reached from the lobby's per-room Admin link or after creation. Shows the active room (name and variant), game stage/progress, draw/manual call, Bingo verification, reset, and recent calls once the room is open; a missing room redirects to the lobby. `Space` draws outside form fields. |
 | `/player-card` | Generates card sets for a selected 75-ball or 90-ball room. It loads the room directory to use the selected display name as the printed card-set name and its variant as the card layout, but does not subscribe to the room or automatically mark calls. |
 
 `Board.tsx` is one conditional-layout component for 90-ball, 75-ball, and Speedy Bingo boards. `CallerDisplay.tsx` uses a polite live region for the current number. `ThemeToggle.tsx` stores the selected light or dark theme in browser local storage.

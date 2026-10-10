@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 
 test.describe('accessibility', () => {
-  for (const route of ['/lobby', '/game-room?room=default', '/admin-panel', '/player-card']) {
+  for (const route of ['/lobby', '/game-room?room=default', '/admin-panel/create', '/player-card']) {
     test(`${route} has no axe WCAG A/AA or best-practice violations`, async ({ page }) => {
       await page.goto(route);
       if (route === '/player-card') {
@@ -23,7 +23,7 @@ test.describe('accessibility', () => {
   });
 
   test('lobby with a room passes the automated checks in both themes and keeps link names consistent', async ({ page }) => {
-    await page.goto('/admin-panel');
+    await page.goto('/admin-panel/create');
     await page.getByLabel('Room name').fill('A11y Lobby');
     await page.getByRole('button', { name: 'Create Room' }).click();
     await page.waitForURL(/room=/);
@@ -40,8 +40,43 @@ test.describe('accessibility', () => {
     expect(results.violations).toEqual([]);
   });
 
-  test('lobby theme toggle is the first tab stop with a visible focus indicator', async ({ page }) => {
+  test('create and game control pages honour the saved dark theme and pass axe in dark mode', async ({ page }) => {
+    await page.goto('/admin-panel/create');
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    let results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
+    expect(results.violations).toEqual([]);
+
+    await page.getByLabel('Room name').fill('A11y Dark Admin');
+    await page.getByRole('button', { name: 'Create Room' }).click();
+    await page.waitForURL(/\/admin-panel\?room=/);
+    await expect(page.getByText('Active room: A11y Dark Admin (75-ball)')).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
+    expect(results.violations).toEqual([]);
+
+    await page.getByRole('button', { name: 'Switch to light mode' }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  });
+
+  test('create room and game control pages pass the automated accessibility audit', async ({ page }) => {
+    await page.goto('/admin-panel/create');
+    let results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
+    expect(results.violations).toEqual([]);
+
+    await page.getByLabel('Room name').fill('A11y Admin Steps');
+    await page.getByRole('button', { name: 'Create Room' }).click();
+    await page.waitForURL(/room=/);
+    await expect(page.getByText('Active room: A11y Admin Steps (75-ball)')).toBeVisible();
+
+    results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
+    expect(results.violations).toEqual([]);
+  });
+
+  test('lobby header actions come first in tab order with a visible focus indicator', async ({ page }) => {
     await page.goto('/lobby');
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('link', { name: 'Create Room' })).toBeFocused();
     await page.keyboard.press('Tab');
     const toggle = page.getByRole('button', { name: 'Switch to dark mode' });
     await expect(toggle).toBeFocused();
@@ -57,18 +92,11 @@ test.describe('accessibility', () => {
   });
 
   test('90-ball player cards have accessible table structure', async ({ page }) => {
-    await page.goto('/admin-panel');
+    await page.goto('/admin-panel/create');
     await page.getByLabel('Room name').fill('A11y 90-ball cards');
+    await page.getByLabel('New room variant').selectOption('90-ball');
     await page.getByRole('button', { name: 'Create Room' }).click();
     await page.waitForURL(/room=/);
-    const variantChange = page.waitForResponse((response) =>
-      response.url().endsWith('/api/game')
-      && response.request().method() === 'POST'
-      && response.request().postDataJSON().action === 'change-variant'
-      && response.ok(),
-    );
-    await page.getByRole('combobox', { name: 'Game variant' }).selectOption('90-ball');
-    await variantChange;
 
     await page.goto('/player-card');
     await page.getByLabel('Card set room').selectOption({ label: 'A11y 90-ball cards - 90-ball' });
@@ -78,7 +106,10 @@ test.describe('accessibility', () => {
   });
 
   test('verification dialog is keyboard operable and keeps focus modal', async ({ page }) => {
-    await page.goto('/admin-panel');
+    await page.goto('/admin-panel/create');
+    await page.getByLabel('Room name').fill('A11y Verify Dialog');
+    await page.getByRole('button', { name: 'Create Room' }).click();
+    await page.waitForURL(/room=/);
     const trigger = page.getByRole('button', { name: 'Verify Bingo' });
     await trigger.focus();
     await page.keyboard.press('Space');
@@ -105,18 +136,20 @@ test.describe('accessibility', () => {
     await expect(trigger).toBeFocused();
   });
 
-  test('keyboard navigation follows page order and shows a focus indicator', async ({ page }) => {
-    await page.goto('/admin-panel');
+  test('keyboard navigation on the create page follows page order and shows a focus indicator', async ({ page }) => {
+    await page.goto('/admin-panel/create');
     await page.keyboard.press('Tab');
-    await expect(page.locator('#room-id')).toBeFocused();
-    const outlineStyle = await page.locator('#room-id').evaluate((element) => getComputedStyle(element).outlineStyle);
-    expect(outlineStyle).toBe('solid');
-
+    await expect(page.getByRole('button', { name: 'Create Room' })).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('link', { name: 'Open Game Room' })).toBeFocused();
+    await expect(page.getByRole('link', { name: 'Cancel' })).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('link', { name: 'Lobby' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Switch to dark mode' })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(page.locator('#new-room-name')).toBeFocused();
+    const outlineStyle = await page.locator('#new-room-name').evaluate((element) => getComputedStyle(element).outlineStyle);
+    expect(outlineStyle).not.toBe('none');
+
+    await page.keyboard.press('Tab');
+    await expect(page.locator('#new-room-variant')).toBeFocused();
   });
 });

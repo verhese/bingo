@@ -8,7 +8,7 @@ Bingo is an accessibility-focused web app for community bingo sessions. It gives
 - Independent named game rooms using a `room` query parameter.
 - 90-ball, 75-ball, and Speedy Bingo variants.
 - Built-in Single Row and Standard game modes, plus room-local custom 75-ball modes with reorderable stages.
-- Random draws, validated manual calls, resets, variant changes, and five-number Bingo-claim verification.
+- Random draws, validated manual calls, resets, and five-number Bingo-claim verification.
 - Live room-scoped updates over WebSocket.
 - High-contrast light theme, persisted dark-theme option, and keyboard caller controls.
 - Printable 75-ball and 90-ball card sets with browser print and A4 PDF download.
@@ -41,7 +41,8 @@ The Next.js app runs at `http://localhost:3000`; the WebSocket game service runs
 | URL | Purpose |
 |---|---|
 | `http://localhost:3000/game-room` | Projector-facing game room |
-| `http://localhost:3000/admin-panel` | Caller controls |
+| `http://localhost:3000/admin-panel/create` | Create a room (redirects to game control) |
+| `http://localhost:3000/admin-panel?room=<id>` | Caller game controls for one room |
 | `http://localhost:3000/player-card` | Player-card generation, printing, and PDF download |
 
 Use the same `room` value in the game room and admin URLs to share a session, for example `?room=hall-a`. Missing or invalid room IDs select `default`.

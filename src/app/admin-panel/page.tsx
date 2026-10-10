@@ -5,14 +5,15 @@ import { AlertTriangle, RotateCcw, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGameSession } from '@/lib/useGameSession';
 import { RecentCalls } from '@/components/RecentCalls';
-import { VariantSelector } from '@/components/VariantSelector';
 import { GameStageStatus } from '@/components/GameStageStatus';
+import { PageBar } from '@/components/PageBar';
 import { VARIANTS } from '@/lib/variants';
 import { verifyBingoClaim, type BingoClaimResult } from '@/lib/bingoClaim';
 import { BINGO_PATTERNS, getBingoPatternNumberCounts, type BingoPattern } from '@/lib/bingoPatterns';
-import { BUILT_IN_GAME_MODES, DEFAULT_GAME_MODE_ID } from '@/lib/gameModes';
+import { BUILT_IN_GAME_MODES } from '@/lib/gameModes';
 import { normalizeRoomId } from '@/lib/gameRoom';
-import type { GameState, GameVariant, RoomSummary } from '@/types/game';
+import { getOpenAdminRoom } from '@/lib/adminRoom';
+import type { GameVariant, RoomSummary } from '@/types/game';
 import { getWebSocketUrl } from '@/lib/websocketUrl';
 
 const WS_URL = getWebSocketUrl();
@@ -20,12 +21,14 @@ const WS_URL = getWebSocketUrl();
 function AdminPanel() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const roomId = normalizeRoomId(searchParams.get('room'));
+  const requestedRoomId = searchParams.get('room')?.trim() ?? '';
+  const normalizedRoomId = normalizeRoomId(requestedRoomId);
+  const roomId = requestedRoomId && (normalizedRoomId !== 'default' || requestedRoomId.toLowerCase() === 'default')
+    ? normalizedRoomId
+    : '';
   const [variant, setVariant] = useState<GameVariant>('75-ball');
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
-  const [newRoomName, setNewRoomName] = useState('');
-  const [newRoomVariant, setNewRoomVariant] = useState<GameVariant>('75-ball');
-  const [newRoomGameModeId, setNewRoomGameModeId] = useState(DEFAULT_GAME_MODE_ID);
+  const [roomsLoaded, setRoomsLoaded] = useState(false);
   const [manualNumber, setManualNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [claimNumbers, setClaimNumbers] = useState(['', '', '', '', '']);
@@ -34,8 +37,6 @@ function AdminPanel() {
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
   const [undoConfirmation, setUndoConfirmation] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
-  const [gameModeName, setGameModeName] = useState('');
-  const [selectedPatterns, setSelectedPatterns] = useState<BingoPattern[]>([]);
   const verifyDialogRef = useRef<HTMLDialogElement>(null);
   const {
     drawNumber,
@@ -43,6 +44,7 @@ function AdminPanel() {
     undoLastCall,
     state,
   } = useGameSession(WS_URL, roomId);
+  const activeRoom = getOpenAdminRoom(roomId, rooms, state);
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
   const drawMode = state?.drawMode ?? null;
   const autoDrawLocked = drawMode === 'manual';
@@ -53,11 +55,11 @@ function AdminPanel() {
   const claimMinimum = claimCounts[0];
   const lastCall = state?.drawnNumbers.at(-1);
   const canUndo = drawMode === 'manual' && state?.status === 'in-play' && lastCall !== undefined;
-  const supportsGameModes = newRoomVariant === '75-ball';
 
   useEffect(() => {
     setUndoConfirmation(false);
     setVariant('75-ball');
+    setRoomsLoaded(false);
     const loadRooms = async () => {
       try {
         const response = await fetch('/api/game?rooms=true');
@@ -66,10 +68,16 @@ function AdminPanel() {
         if (Array.isArray(result.sessions)) setRooms(result.sessions);
       } catch {
         // The active room remains available while the directory is unavailable.
+      } finally {
+        setRoomsLoaded(true);
       }
     };
     void loadRooms();
   }, [roomId]);
+
+  useEffect(() => {
+    if (!roomId) router.replace('/lobby');
+  }, [roomId, router]);
 
   useEffect(() => {
     if (state) setVariant(state.variant);
@@ -91,86 +99,8 @@ function AdminPanel() {
     }
   }, [isVerifyDialogOpen]);
 
-  const handleCreateRoom = async (event: React.SyntheticEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    try {
-      const response = await fetch('/api/game', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'create-session',
-          roomName: newRoomName,
-          variant: newRoomVariant,
-          ...(supportsGameModes ? { gameModeId: newRoomGameModeId } : {}),
-          ...(supportsGameModes && newRoomGameModeId === 'custom' ? { gameModeName, patterns: selectedPatterns } : {}),
-        }),
-      });
-      if (!response.ok) {
-        const result = (await response.json()) as { error?: string };
-        throw new Error(result.error ?? 'Unable to create the room');
-      }
-      const result = (await response.json()) as { gameState: GameState };
-      setRooms((currentRooms) => [
-        ...currentRooms.filter((room) => room.sessionId !== result.gameState.sessionId),
-        {
-          sessionId: result.gameState.sessionId,
-          roomName: result.gameState.roomName,
-          variant: result.gameState.variant,
-          drawnCount: result.gameState.drawnNumbers.length,
-          status: result.gameState.status,
-        },
-      ].sort((first, second) => first.roomName.localeCompare(second.roomName)));
-      setNewRoomName('');
-      setNewRoomVariant('75-ball');
-      setNewRoomGameModeId(DEFAULT_GAME_MODE_ID);
-      setGameModeName('');
-      setSelectedPatterns([]);
-      router.push(`/admin-panel?room=${encodeURIComponent(result.gameState.sessionId)}`);
-    } catch (createError) {
-      setServiceError(createError instanceof Error ? createError.message : 'Unable to create the room');
-    }
-  };
-
-  const handleVariantChange = async (newVariant: GameVariant) => {
-    setServiceError(null);
-    try {
-      const response = await fetch('/api/game', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'change-variant', sessionId: roomId, variant: newVariant }),
-      });
-
-      if (!response.ok) {
-        const result = (await response.json()) as { error?: string };
-        throw new Error(result.error ?? 'Unable to change the game variant');
-      }
-
-      setVariant(newVariant);
-    } catch (variantError) {
-      setServiceError(variantError instanceof Error ? variantError.message : 'Unable to change the game variant');
-    }
-  };
-
-  const togglePattern = (pattern: BingoPattern) => {
-    setSelectedPatterns((current) => (
-      current.includes(pattern)
-        ? current.filter((selected) => selected !== pattern)
-        : [...current, pattern]
-    ));
-  };
-
-  const movePattern = (index: number, direction: -1 | 1) => {
-    setSelectedPatterns((current) => {
-      const targetIndex = index + direction;
-      if (targetIndex < 0 || targetIndex >= current.length) return current;
-      const reordered = [...current];
-      [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
-      return reordered;
-    });
-  };
-
   const handleDrawNumber = async () => {
-    if (autoDrawLocked) return;
+    if (!activeRoom || autoDrawLocked) return;
     setServiceError(null);
     try {
       await drawNumber();
@@ -209,7 +139,7 @@ function AdminPanel() {
 
   const handleManualCall = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (manualCallLocked) return;
+    if (!activeRoom || manualCallLocked) return;
     setError(null);
     try {
       await callNumber(Number(manualNumber));
@@ -268,11 +198,11 @@ function AdminPanel() {
       || target.closest('input, select, textarea, button, a, [role="dialog"], [role="button"], [role="checkbox"], [role="radio"], [role="switch"], [contenteditable="true"]')
     ) return;
 
-    if (e.code === 'Space') {
+    if (activeRoom && e.code === 'Space') {
       e.preventDefault(); // Prevent page scroll
       if (!autoDrawLocked) void handleDrawNumber();
     }
-  }, [autoDrawLocked, handleDrawNumber]);
+  }, [activeRoom, autoDrawLocked, handleDrawNumber]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -280,7 +210,7 @@ function AdminPanel() {
   }, [handleKeyDown]);
 
   return (
-    <main className="flex min-h-screen w-screen flex-col items-center justify-center bg-bingo-bg p-8 text-2xl">
+    <main className="page-shell text-xl">
       {serviceError && (
         <div role="alert" className="fixed right-4 top-4 z-50 flex max-w-md items-start gap-3 rounded-lg border-2 border-bingo-danger bg-bingo-surface p-4 text-lg text-bingo-text shadow-2xl">
           <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-bingo-danger" aria-hidden="true" />
@@ -296,155 +226,65 @@ function AdminPanel() {
           </button>
         </div>
       )}
-      <h1 className="mb-8 heading-lg font-bold text-bingo-text">Admin Panel</h1>
-      <GameStageStatus state={state} />
-      <div className="flex flex-col gap-6">
-        <section className="flex flex-col gap-3">
-          <label htmlFor="room-id" className="font-bold text-bingo-text">Active room</label>
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              id="room-id"
-              value={roomId}
-              onChange={(event) => router.push(`/admin-panel?room=${encodeURIComponent(event.target.value)}`)}
-              className="w-56 rounded border-2 border-bingo-muted bg-bingo-surface px-4 py-3 text-xl font-bold text-bingo-text"
-            >
-              {(rooms.some((room) => room.sessionId === roomId) ? rooms : [{ sessionId: roomId, roomName: roomId, variant, drawnCount: 0, status: 'waiting' as const }, ...rooms]).map((room) => (
-                <option key={room.sessionId} value={room.sessionId}>{room.roomName} - {room.variant}, {room.drawnCount} called</option>
-              ))}
-            </select>
-            <a
-              href={`/game-room?room=${encodeURIComponent(roomId)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-lg border-2 border-bingo-muted px-5 py-3 text-lg font-bold text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
-            >
-              Open Game Room
-            </a>
-            <a
-              href="/lobby"
-              className="rounded-lg border-2 border-bingo-muted px-5 py-3 text-lg font-bold text-bingo-text hover:border-bingo-accent hover:text-bingo-accent"
-            >
-              Lobby
-            </a>
-          </div>
-          <form onSubmit={handleCreateRoom} className="flex flex-col gap-3 rounded-lg border-2 border-bingo-muted bg-bingo-surface p-4">
-            <h2 className="text-xl font-bold text-bingo-text">Create a new room</h2>
-            <label htmlFor="new-room-name" className="font-bold text-bingo-text">Room name</label>
-            <input id="new-room-name" type="text" value={newRoomName} onChange={(event) => setNewRoomName(event.target.value)} maxLength={40} className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text" required />
-            <label htmlFor="new-room-variant" className="font-bold text-bingo-text">New room variant</label>
-            <select
-              id="new-room-variant"
-              value={newRoomVariant}
-              onChange={(event) => setNewRoomVariant(event.target.value as GameVariant)}
-              className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text"
-            >
-              {Object.values(VARIANTS).map((item) => (
-                <option key={item.name} value={item.name}>{item.name}</option>
-              ))}
-            </select>
-            {supportsGameModes && (
-              <>
-            <label htmlFor="new-room-game-mode" className="font-bold text-bingo-text">Room game mode</label>
-            <select
-              id="new-room-game-mode"
-              value={newRoomGameModeId}
-              onChange={(event) => setNewRoomGameModeId(event.target.value)}
-              className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text"
-            >
-              {BUILT_IN_GAME_MODES.map((mode) => (
-                <option key={mode.id} value={mode.id}>{mode.name}</option>
-              ))}
-              <option value="custom">Custom mode</option>
-            </select>
-            {newRoomGameModeId === 'custom' && (
-              <>
-                <label htmlFor="new-room-game-mode-name" className="font-bold text-bingo-text">Custom mode name</label>
-                <input
-                  id="new-room-game-mode-name"
-                  type="text"
-                  value={gameModeName}
-                  onChange={(event) => setGameModeName(event.target.value)}
-                  maxLength={40}
-                  required
-                  className="w-full rounded border-2 border-bingo-muted bg-bingo-bg px-4 py-3 text-lg font-bold text-bingo-text"
-                />
-                <fieldset className="flex flex-col gap-2">
-                  <legend className="mb-1 font-bold text-bingo-text">Patterns (in stage order)</legend>
-                  {Object.keys(BINGO_PATTERNS).map((pattern) => {
-                    const typedPattern = pattern as BingoPattern;
-                    return (
-                      <label key={pattern} className="flex items-center gap-2 text-bingo-text">
-                        <input
-                          type="checkbox"
-                          checked={selectedPatterns.includes(typedPattern)}
-                          onChange={() => togglePattern(typedPattern)}
-                          className="h-5 w-5 accent-bingo-accent"
-                        />
-                        {BINGO_PATTERNS[typedPattern].name}
-                      </label>
-                    );
-                  })}
-                </fieldset>
-                {selectedPatterns.length > 0 && (
-                  <ol aria-label="Custom mode stage order" className="flex flex-col gap-2">
-                    {selectedPatterns.map((pattern, index) => (
-                      <li key={pattern} className="flex items-center justify-between gap-3 rounded border border-bingo-muted bg-bingo-bg px-3 py-2 text-bingo-text">
-                        <span>{index + 1}. {BINGO_PATTERNS[pattern].name}</span>
-                        <span className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => movePattern(index, -1)}
-                            disabled={index === 0}
-                            aria-label={`Move ${BINGO_PATTERNS[pattern].name} earlier`}
-                            className="rounded border border-bingo-muted px-3 py-1 disabled:opacity-40"
-                          >
-                            Up
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => movePattern(index, 1)}
-                            disabled={index === selectedPatterns.length - 1}
-                            aria-label={`Move ${BINGO_PATTERNS[pattern].name} later`}
-                            className="rounded border border-bingo-muted px-3 py-1 disabled:opacity-40"
-                          >
-                            Down
-                          </button>
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
+      <PageBar title="Game control">
+        {activeRoom && (
+          <a
+            href={`/game-room?room=${encodeURIComponent(roomId)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="bar-button"
+          >
+            Open Game Room
+          </a>
+        )}
+        <a href="/lobby" className="bar-button">Back to lobby</a>
+      </PageBar>
+      <div className="page-content">
+        <section aria-labelledby="room-step-title" className="page-panel flex flex-col gap-4">
+          <h2 id="room-step-title" className="text-2xl font-bold text-bingo-text">Room</h2>
+          {activeRoom ? (
+            <>
+              <p role="status" className="font-bold text-bingo-accent">
+                Active room: {activeRoom.roomName} ({activeRoom.variant})
+              </p>
+              <div className="flex flex-col gap-3 rounded-lg border border-bingo-muted p-4">
+                <h3 className="font-bold text-bingo-text">Room settings</h3>
+                <p className="text-bingo-text">
+                  Game variant: {activeRoom.variant} — fixed when this room was created.
+                                </p>
+                {(state?.variant ?? variant) === '75-ball' && (
+                  <section className="flex flex-col gap-3 rounded-lg border border-bingo-muted bg-bingo-bg p-4">
+                    <h4 className="font-bold text-bingo-text">75-ball game mode</h4>
+                    <p className="text-bingo-text">
+                      {state?.customGameModes.find((mode) => mode.id === state.gameModeId)?.name
+                        ?? BUILT_IN_GAME_MODES.find((mode) => mode.id === state?.gameModeId)?.name
+                        ?? state?.gameModeId}
+                      {' — '}fixed when this room was created.
+                    </p>
+                  </section>
                 )}
-              </>
-            )}
-            <p className="text-sm text-bingo-muted">The game mode is fixed for the lifetime of the room.</p>
-              </>
-            )}
-            <button
-              type="submit"
-              disabled={supportsGameModes && newRoomGameModeId === 'custom' && selectedPatterns.length === 0}
-              className="self-start rounded-lg bg-bingo-accent px-5 py-3 text-lg font-bold text-bingo-bg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Create Room
-            </button>
-          </form>
+              </div>
+            </>
+          ) : (
+            <p role="status" className="text-bingo-muted">
+              {!roomsLoaded
+                ? 'Loading the selected room…'
+                : rooms.some((room) => room.sessionId === roomId)
+                  ? 'Opening the selected room…'
+                  : 'This room is unavailable. Return to the lobby or create a new room.'}
+            </p>
+          )}
         </section>
+        <section aria-labelledby="game-control-step-title" className="page-panel flex flex-col gap-4">
+          <h2 id="game-control-step-title" className="text-2xl font-bold text-bingo-text">Game controls</h2>
+          {activeRoom ? (
+            <>
+        <GameStageStatus state={state} />
         <RecentCalls drawnNumbers={state?.drawnNumbers ?? []} />
         {drawMode && (
           <output className="text-sm font-bold text-bingo-accent">
             Draw mode locked: {drawMode === 'auto' ? 'automatic' : 'manual'}.
           </output>
-        )}
-        <VariantSelector current={variant} onChange={handleVariantChange} />
-        {(state?.variant ?? variant) === '75-ball' && (
-          <section className="flex flex-col gap-3 rounded-lg border-2 border-bingo-muted bg-bingo-surface p-4">
-            <h2 className="text-xl font-bold text-bingo-text">75-ball game mode</h2>
-            <p className="text-bingo-text">
-              {state?.customGameModes.find((mode) => mode.id === state.gameModeId)?.name
-                ?? BUILT_IN_GAME_MODES.find((mode) => mode.id === state?.gameModeId)?.name
-                ?? state?.gameModeId}
-              {' — '}fixed when this room was created.
-            </p>
-          </section>
         )}
         <form onSubmit={handleManualCall} className="flex flex-col gap-3">
           <label htmlFor="manual-number" className="font-bold text-bingo-text">
@@ -523,6 +363,11 @@ function AdminPanel() {
         <p className="text-sm text-bingo-muted">
           Press <kbd className="rounded bg-bingo-surface px-1.5 py-0.5 font-mono text-base">Space</kbd> to draw when focus is outside an interactive control.
         </p>
+            </>
+          ) : (
+            <p className="text-bingo-muted">Game controls will be available once the room is open.</p>
+          )}
+        </section>
       </div>
       {isVerifyDialogOpen && (
           <dialog
