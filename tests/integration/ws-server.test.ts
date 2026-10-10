@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
-import { openSubscriber, request, startGameServer, waitFor, type TestServer } from './helpers';
+import { openSubscriber, request, requestRaw, startGameServer, waitFor, type TestServer } from './helpers';
 
 type State = {
   sessionId: string;
@@ -268,8 +268,15 @@ describe('game server (WebSocket)', () => {
     });
   });
 
-  it('ignores malformed messages', async () => {
+  it('ignores unknown actions', async () => {
     const reply = await request(server.url, { action: 'not-a-real-action', sessionId: 'default' });
+    assert.equal(reply, null);
+    const state = await send({ action: 'ping', sessionId: 'default' });
+    assert.equal(state?.sessionId, 'default');
+  });
+
+  it('ignores malformed JSON messages', async () => {
+    const reply = await requestRaw(server.url, '{');
     assert.equal(reply, null);
     const state = await send({ action: 'ping', sessionId: 'default' });
     assert.equal(state?.sessionId, 'default');

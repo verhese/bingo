@@ -24,7 +24,7 @@ When creating a room, you can also define a custom mode by selecting patterns an
 
 ## Requirements
 
-- Node.js 18 or later
+- Node.js 20.9 or later
 - npm
 
 ## Local development

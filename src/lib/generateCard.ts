@@ -59,37 +59,35 @@ export function generate90BallCard(_count: number = 1): { row: number[]; blanks:
     [80, 89],  // col 8
   ];
 
-  // Ensure each row has exactly 5 numbers (4 blanks)
-  // Strategy: pick which column gets a blank in each row
+  let blankColumns: Set<number>[];
+  do {
+    blankColumns = Array.from({ length: 3 }, () => {
+      const blanks = new Set<number>();
+      while (blanks.size < 4) blanks.add(Math.floor(Math.random() * 9));
+      return blanks;
+    });
+  } while (colRanges.some((_, col) => blankColumns.every((blanks) => blanks.has(col))));
+
   for (let row = 0; row < 3; row++) {
-    const blanksForRow = new Set<number>();
-    while (blanksForRow.size < 4) {
-      blanksForRow.add(Math.floor(Math.random() * 9));
-    }
-    card[row].blanks = Array.from({ length: 9 }, (_, col) => blanksForRow.has(col));
+    card[row].blanks = Array.from({ length: 9 }, (_, col) => blankColumns[row].has(col));
   }
 
-  // For each column, pick which rows get a number (must have at least 1 per column)
   for (let col = 0; col < 9; col++) {
     const [min, max] = colRanges[col];
     const pool = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+    const rowIndices = card
+      .map(({ blanks }, rowIndex) => (blanks[col] ? -1 : rowIndex))
+      .filter((rowIndex) => rowIndex !== -1);
 
-    // Decide how many rows get a number in this column (at least 1)
-    const numInCol = Math.floor(Math.random() * 3) + 1; // 1-3
-    // Shuffle which rows get it
-    const rowIndices = [0, 1, 2].sort(() => {
-      return Math.random() - 0.5;
-    }).slice(0, numInCol);
-
-    for (const rowIndex of rowIndices) {
-      if (card[rowIndex].blanks[col]) continue; // skip if blank
-      // Pick random number from pool
-      const pickIdx = Math.floor(Math.random() * pool.length);
-      card[rowIndex].row[col] = pool[pickIdx];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
     }
+    rowIndices.forEach((rowIndex, index) => {
+      card[rowIndex].row[col] = pool[index];
+    });
   }
 
-  // Ensure each column has at least one number (re-run blanks for empty columns)
   return card;
 }
 

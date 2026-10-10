@@ -27,14 +27,36 @@ export async function startGameServer(): Promise<TestServer> {
   });
 
   await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Game server did not start in time')), 20_000);
-    child.once('exit', (code) => reject(new Error(`Game server exited early (${code})`)));
-    child.stdout?.on('data', (chunk: Buffer) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    function cleanup() {
+      clearTimeout(timer);
+      child.removeListener('exit', onExit);
+      child.removeListener('error', onError);
+      child.stdout?.removeListener('data', onData);
+    }
+    function fail(error: Error) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+      reject(error);
+    }
+    const onExit = (code: number | null) => fail(new Error(`Game server exited early (${code})`));
+    const onError = (error: Error) => fail(error);
+    const onData = (chunk: Buffer) => {
       if (chunk.toString().includes('running on')) {
-        clearTimeout(timer);
+        if (settled) return;
+        settled = true;
+        cleanup();
         resolve();
       }
-    });
+    };
+
+    timer = setTimeout(() => fail(new Error('Game server did not start in time')), 20_000);
+    child.once('exit', onExit);
+    child.once('error', onError);
+    child.stdout?.on('data', onData);
   });
 
   return {
@@ -48,10 +70,10 @@ export async function startGameServer(): Promise<TestServer> {
   };
 }
 
-/** Sends one message and resolves with the first reply, or null if none arrives. */
-export async function request<T = Record<string, unknown>>(
+/** Sends a raw message and resolves with the first reply, or null if none arrives. */
+export async function requestRaw<T = Record<string, unknown>>(
   url: string,
-  message: Record<string, unknown>,
+  message: string,
   timeoutMs = 750,
 ): Promise<T | null> {
   return new Promise((resolve, reject) => {
@@ -60,7 +82,7 @@ export async function request<T = Record<string, unknown>>(
       socket.close();
       resolve(null);
     }, timeoutMs);
-    socket.once('open', () => socket.send(JSON.stringify(message)));
+    socket.once('open', () => socket.send(message));
     socket.once('message', (data) => {
       clearTimeout(timer);
       socket.close();
@@ -71,6 +93,15 @@ export async function request<T = Record<string, unknown>>(
       reject(error);
     });
   });
+}
+
+/** Sends one JSON message and resolves with the first reply, or null if none arrives. */
+export function request<T = Record<string, unknown>>(
+  url: string,
+  message: Record<string, unknown>,
+  timeoutMs = 750,
+): Promise<T | null> {
+  return requestRaw(url, JSON.stringify(message), timeoutMs);
 }
 
 export async function openSubscriber(url: string, sessionId: string) {
