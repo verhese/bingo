@@ -25,7 +25,7 @@ export default defineConfig({
     {
       command: `npx next dev -p ${WEB_PORT}`,
       env: {
-        NEXT_PUBLIC_WS_URL: `ws://localhost:${WS_PORT}`,
+        WS_PUBLIC_URL: `ws://localhost:${WS_PORT}`,
         GAME_SERVER_WS_URL: `ws://localhost:${WS_PORT}`,
         NEXT_DIST_DIR: '.next-e2e',
       },

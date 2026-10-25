@@ -84,7 +84,7 @@ The deprecated `select-game-mode` and `create-game-mode` actions are rejected: a
 
 ## Browser WebSocket protocol
 
-Browsers connect to `NEXT_PUBLIC_WS_URL` when configured; otherwise they use the current page hostname on port `3001` and select `ws` or `wss` from the page protocol. After connecting, the client must subscribe:
+Browsers connect to the runtime `WS_PUBLIC_URL` (served by `GET /api/ws-config`) when configured; otherwise they use the current page hostname on port `3001` and select `ws` or `wss` from the page protocol. After connecting, the client must subscribe:
 
 ```json
 { "action": "subscribe", "sessionId": "hall-a" }
