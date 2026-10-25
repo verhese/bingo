@@ -38,6 +38,8 @@ pnpm-debug.log*
 # Generated Next.js TypeScript declarations
 next-env.d.ts
 bingo-web.tar.gz
+*.tar
+*.tar.gz
 bingo.code-workspace
 
 # Playwright

@@ -14,9 +14,6 @@ import { BUILT_IN_GAME_MODES } from '@/lib/gameModes';
 import { normalizeRoomId } from '@/lib/gameRoom';
 import { getOpenAdminRoom } from '@/lib/adminRoom';
 import type { GameVariant, RoomSummary } from '@/types/game';
-import { getWebSocketUrl } from '@/lib/websocketUrl';
-
-const WS_URL = getWebSocketUrl();
 
 function AdminPanel() {
   const router = useRouter();
@@ -43,7 +40,7 @@ function AdminPanel() {
     callNumber,
     undoLastCall,
     state,
-  } = useGameSession(WS_URL, roomId);
+  } = useGameSession(roomId);
   const activeRoom = getOpenAdminRoom(roomId, rooms, state);
   const maxNumber = VARIANTS[state?.variant ?? variant].maxNumber;
   const drawMode = state?.drawMode ?? null;

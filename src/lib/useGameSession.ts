@@ -4,14 +4,33 @@ import { useState, useEffect } from 'react';
 import { DEFAULT_ROOM_ID } from '@/lib/gameRoom';
 import type { GameState } from '@/types/game';
 
-export function useGameSession(url: string, sessionId = DEFAULT_ROOM_ID) {
+function defaultWebSocketUrl(): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${protocol}://${window.location.hostname}:3001`;
+}
+
+/** Resolves the browser-facing WebSocket URL configured at runtime via WS_PUBLIC_URL. */
+export async function fetchWebSocketUrl(signal?: AbortSignal): Promise<string> {
+  try {
+    const response = await fetch('/api/ws-config', { signal });
+    if (response.ok) {
+      const result = (await response.json()) as { url?: string | null };
+      if (result.url) return result.url;
+    }
+  } catch {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+  }
+  return defaultWebSocketUrl();
+}
+
+export function useGameSession(sessionId = DEFAULT_ROOM_ID) {
   const [state, setState] = useState<GameState | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     let isCurrent = true;
     const controller = new AbortController();
-    const ws = new WebSocket(url);
+    let ws: WebSocket | null = null;
     setState(null);
 
     const loadState = async () => {
@@ -30,18 +49,31 @@ export function useGameSession(url: string, sessionId = DEFAULT_ROOM_ID) {
     };
 
     void loadState();
-    ws.onopen = () => {
-      setConnected(true);
-      ws.send(JSON.stringify({ action: 'subscribe', sessionId }));
+
+    const connect = async () => {
+      let url: string;
+      try {
+        url = await fetchWebSocketUrl(controller.signal);
+      } catch {
+        return;
+      }
+      if (!isCurrent) return;
+      const socket = new WebSocket(url);
+      ws = socket;
+      socket.onopen = () => {
+        setConnected(true);
+        socket.send(JSON.stringify({ action: 'subscribe', sessionId }));
+      };
+      socket.onmessage = (e) => setState(JSON.parse(e.data));
+      socket.onclose = () => setConnected(false);
     };
-    ws.onmessage = (e) => setState(JSON.parse(e.data));
-    ws.onclose = () => setConnected(false);
+    void connect();
     return () => {
       isCurrent = false;
       controller.abort();
-      ws.close();
+      ws?.close();
     };
-  }, [sessionId, url]);
+  }, [sessionId]);
 
   const drawNumber = async () => {
     return performGameAction('draw');

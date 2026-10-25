@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PageBar } from '@/components/PageBar';
-import { getWebSocketUrl } from '@/lib/websocketUrl';
+import { fetchWebSocketUrl } from '@/lib/useGameSession';
 import type { RoomSummary } from '@/types/game';
 
 export default function LobbyPage() {
@@ -13,16 +13,29 @@ export default function LobbyPage() {
   useEffect(() => {
     let isCurrent = true;
     let receivedLiveRooms = false;
-    const socket = new WebSocket(getWebSocketUrl());
-    socket.onopen = () => socket.send(JSON.stringify({ action: 'subscribe-lobby' }));
-    socket.onmessage = (event) => {
-      const result = JSON.parse(event.data) as { sessions?: unknown };
-      if (!isCurrent || !Array.isArray(result.sessions)) return;
-      receivedLiveRooms = true;
-      setRooms(result.sessions as RoomSummary[]);
-      setFailed(false);
-      setLoading(false);
+    const controller = new AbortController();
+    let socket: WebSocket | null = null;
+    const connect = async () => {
+      let url: string;
+      try {
+        url = await fetchWebSocketUrl(controller.signal);
+      } catch {
+        return;
+      }
+      if (!isCurrent) return;
+      const ws = new WebSocket(url);
+      socket = ws;
+      ws.onopen = () => ws.send(JSON.stringify({ action: 'subscribe-lobby' }));
+      ws.onmessage = (event) => {
+        const result = JSON.parse(event.data) as { sessions?: unknown };
+        if (!isCurrent || !Array.isArray(result.sessions)) return;
+        receivedLiveRooms = true;
+        setRooms(result.sessions as RoomSummary[]);
+        setFailed(false);
+        setLoading(false);
+      };
     };
+    void connect();
 
     const loadRooms = async () => {
       try {
@@ -39,7 +52,8 @@ export default function LobbyPage() {
     void loadRooms();
     return () => {
       isCurrent = false;
-      socket.close();
+      controller.abort();
+      socket?.close();
     };
   }, []);
 
