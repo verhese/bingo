@@ -94,8 +94,9 @@ The service immediately sends the room `GameState`, then sends each subsequent s
 
 | Message | Response |
 |---|---|
+| `{ "action": "subscribe-lobby" }` | Initial `{ "sessions": RoomSummary[] }`, followed by refreshed room summaries after accepted room actions |
 | `{ "action": "list-sessions" }` | `{ "sessions": RoomSummary[] }` |
 | `{ "action": "ping", "sessionId": "hall-a" }` | Current `GameState` |
-| Any public game action above | Updated `GameState`, broadcast to subscribed room clients when accepted |
+| Any public game action above | Updated `GameState`, broadcast to subscribed room clients and an updated room list to lobby subscribers when accepted |
 
 Malformed WebSocket JSON is ignored. A draw-mode conflict returns `{ "error": "..." }` to the requesting socket and is not broadcast. Other unsupported or invalid direct WebSocket actions do not produce a structured error response; use the HTTP API for validated caller actions.

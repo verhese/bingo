@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
-import { openSubscriber, request, requestRaw, startGameServer, waitFor, type TestServer } from './helpers';
+import { openLobbySubscriber, openSubscriber, request, requestRaw, startGameServer, waitFor, type TestServer } from './helpers';
 
 type State = {
   sessionId: string;
@@ -295,6 +295,33 @@ describe('game server (WebSocket)', () => {
   });
 
   describe('broadcasts', () => {
+    it('sends lobby subscribers an initial room list and updates it when a number is called', async () => {
+      const lobby = await openLobbySubscriber(server.url);
+      try {
+        const initialSessions = (lobby.messages[0] as { sessions: { sessionId: string }[] }).sessions;
+        const room = await createRoom('Lobby live count');
+        await waitFor(() => lobby.messages.some((message) => (
+          (message as { sessions?: { sessionId: string }[] }).sessions
+            ?.some((summary) => summary.sessionId === room.sessionId)
+        )));
+
+        await send({ action: 'call-number', sessionId: room.sessionId, number: 42 });
+        await waitFor(() => lobby.messages.some((message) => (
+          (message as { sessions?: { sessionId: string; drawnCount: number }[] }).sessions
+            ?.some((summary) => summary.sessionId === room.sessionId && summary.drawnCount === 1)
+        )));
+
+        const initialRoom = initialSessions.find((summary) => summary.sessionId === room.sessionId);
+        const updatedRoom = (lobby.messages.at(-1) as {
+          sessions: { sessionId: string; drawnCount: number }[];
+        }).sessions.find((summary) => summary.sessionId === room.sessionId);
+        assert.equal(initialRoom, undefined);
+        assert.equal(updatedRoom?.drawnCount, 1);
+      } finally {
+        lobby.close();
+      }
+    });
+
     it('notifies subscribers of their own room only', async () => {
       const a = await createRoom('Broadcast A');
       const b = await createRoom('Broadcast B');

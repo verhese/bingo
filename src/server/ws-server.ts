@@ -142,6 +142,7 @@ function getSessionSummaries(): RoomSummary[] {
 const port = Number(process.env.WS_PORT ?? 3001);
 const wss = new WebSocketServer({ port });
 const clientSessionIds = new WeakMap<WebSocket, string>();
+const lobbySubscribers = new Set<WebSocket>();
 
 console.log(`Bingo WebSocket server running on ws://localhost:${port}`);
 
@@ -155,6 +156,13 @@ function broadcastSessionState(gameState: GameState, sender: WebSocket) {
     ) {
       client.send(message);
     }
+  });
+}
+
+function broadcastSessionSummaries() {
+  const message = JSON.stringify({ sessions: getSessionSummaries() });
+  lobbySubscribers.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) client.send(message);
   });
 }
 
@@ -338,6 +346,12 @@ wss.on('connection', (ws: WebSocket) => {
       return;
     }
 
+    if (parsed.action === 'subscribe-lobby') {
+      lobbySubscribers.add(ws);
+      ws.send(JSON.stringify({ sessions: getSessionSummaries() }));
+      return;
+    }
+
     if (parsed.action === 'ping') {
       const session = getSession(parsed.sessionId);
       if (!session) {
@@ -358,9 +372,11 @@ wss.on('connection', (ws: WebSocket) => {
 
     ws.send(JSON.stringify(actionResult));
     broadcastSessionState(actionResult, ws);
+    broadcastSessionSummaries();
   });
 
   ws.on('close', () => {
+    lobbySubscribers.delete(ws);
     console.log('Client disconnected. Total clients:', wss.clients.size);
   });
 

@@ -120,6 +120,22 @@ export async function openSubscriber(url: string, sessionId: string) {
   };
 }
 
+export async function openLobbySubscriber(url: string) {
+  const socket = new WebSocket(url);
+  const messages: Record<string, unknown>[] = [];
+  socket.on('message', (data) => messages.push(JSON.parse(data.toString()) as Record<string, unknown>));
+  await new Promise<void>((resolve, reject) => {
+    socket.once('open', resolve);
+    socket.once('error', reject);
+  });
+  socket.send(JSON.stringify({ action: 'subscribe-lobby' }));
+  await waitFor(() => messages.length >= 1);
+  return {
+    messages,
+    close: () => socket.close(),
+  };
+}
+
 export async function waitFor(condition: () => boolean, timeoutMs = 3000): Promise<void> {
   const start = Date.now();
   while (!condition()) {
