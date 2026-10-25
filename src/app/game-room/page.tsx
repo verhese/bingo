@@ -12,9 +12,6 @@ import type { GameVariant } from '@/types/game';
 import { VARIANTS } from '@/lib/variants';
 import { normalizeRoomId } from '@/lib/gameRoom';
 import { shouldReturnToLobby, type ObservedRoomStatus } from '@/lib/lobbyRedirect';
-import { getWebSocketUrl } from '@/lib/websocketUrl';
-
-const WS_URL = getWebSocketUrl();
 
 function GameRoom() {
   const router = useRouter();
@@ -22,7 +19,7 @@ function GameRoom() {
   const room = searchParams.get('room');
   const hasRoom = Boolean(room?.trim());
   const roomId = normalizeRoomId(room);
-  const { state } = useGameSession(WS_URL, roomId);
+  const { state } = useGameSession(roomId);
   const previousStatus = useRef<ObservedRoomStatus | null>(null);
   const variant = (state?.variant as GameVariant) ?? '75-ball';
   const cfg = VARIANTS[variant];

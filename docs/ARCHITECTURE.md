@@ -48,6 +48,6 @@ The service keeps sessions in a process-local `Map`. It does not use a database,
 
 ## Deployment
 
-Docker Compose runs `web` and `ws-server` as separate containers. The web container reaches the service through `GAME_SERVER_WS_URL=ws://ws-server:3001`. Browsers connect either through `NEXT_PUBLIC_WS_URL` or the current page hostname on port `3001`, using `wss` when the page uses HTTPS.
+Docker Compose runs `web` and `ws-server` as separate containers. The web container reaches the service through `GAME_SERVER_WS_URL=ws://ws-server:3001`. Browsers connect either through the runtime `WS_PUBLIC_URL` (served by `/api/ws-config`) or the current page hostname on port `3001`, using `wss` when the page uses HTTPS.
 
 For exact request, response, and WebSocket message contracts, see [../shared/flow-webservice-api-reference.md](../shared/flow-webservice-api-reference.md).

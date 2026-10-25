@@ -69,11 +69,29 @@ Before the first end-to-end run, install the browser with `npx playwright instal
 
 [compose.yaml](compose.yaml) runs the web application and WebSocket game service as separate containers. Publish port `3000` for the web app and port `3001` for browser WebSocket connections.
 
-`GAME_SERVER_WS_URL=ws://ws-server:3001` is configured inside Compose for the web container. Browsers must not use that internal hostname. By default clients use the page hostname on port `3001`; set `NEXT_PUBLIC_WS_URL` before building when a different public WebSocket URL is required:
+`GAME_SERVER_WS_URL=ws://ws-server:3001` is configured inside Compose for the web container. Browsers must not use that internal hostname. By default clients use the page hostname on port `3001`. Set `WS_PUBLIC_URL` on the `web` service when a different public WebSocket URL is required (for example behind a reverse proxy, such as on a Synology NAS):
 
 ```env
-NEXT_PUBLIC_WS_URL=wss://bingo.example.com:3001
+WS_PUBLIC_URL=wss://bingo.example.com
 ```
+
+This is a runtime variable served through `/api/ws-config`, so changing it only needs a container restart (`docker compose up -d`), not a rebuild.
+
+### Prebuilt image
+
+CI publishes one generic image to GHCR (`ghcr.io/<owner>/bingo`, tags `latest` and the commit SHA) and, when the `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` secrets exist, to Docker Hub. Use it for both services instead of building locally:
+
+```yaml
+services:
+  web:
+    image: ghcr.io/<owner>/bingo:latest
+    command: npm start
+  ws-server:
+    image: ghcr.io/<owner>/bingo:latest
+    command: npm run start:ws
+```
+
+Update with `docker compose pull && docker compose up -d`.
 
 ## Architecture and limitations
 
