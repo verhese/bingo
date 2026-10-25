@@ -103,6 +103,18 @@ test.describe('caller workflow', () => {
     await expect(page).toHaveURL(new RegExp(`/admin-panel\\?room=${roomId}`));
   });
 
+  test('lobby updates the called count when a number is called', async ({ page, context }) => {
+    await createRoom(page, 'E2E Live Lobby', 'standard');
+    const lobby = await context.newPage();
+    await lobby.goto('/lobby');
+    const roomLink = lobby.getByRole('link', { name: /^E2E Live Lobby/ });
+    await expect(roomLink).toContainText('0 called');
+
+    await callNumbers(page, [42]);
+
+    await expect(roomLink).toContainText('1 called');
+  });
+
   test('lobby follows the saved dark theme', async ({ page }) => {
     await page.goto('/lobby');
     await page.getByRole('button', { name: 'Switch to dark mode' }).click();

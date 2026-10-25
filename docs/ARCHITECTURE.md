@@ -23,6 +23,7 @@ flowchart LR
 | HTTP game route | `src/server/api/game/route.ts` | Validates public API calls and proxies them to the WebSocket service. Re-exported at `src/app/api/game/route.ts`. |
 | Game service | `src/server/ws-server.ts` | Creates, stores, mutates, and broadcasts isolated room sessions. Listens on `WS_PORT` or `3001`. |
 | Session hook | `src/lib/useGameSession.ts` | Fetches an initial state from the HTTP API and sends a WebSocket `subscribe` message for updates. |
+| Lobby | `src/app/lobby/page.tsx` | Fetches an initial room directory and subscribes over WebSocket for live summary updates. |
 | Game-domain modules | `src/lib/` | Defines variants, number selection, card generation, room normalization, and Bingo-claim validation. |
 
 ## Rooms and state
@@ -37,6 +38,7 @@ The service keeps sessions in a process-local `Map`. It does not use a database,
 
 | Route | Behavior |
 |---|---|
+| `/lobby` | Lists rooms with live called counts and links to each room and its admin controls. |
 | `/game-room` | Shows a selectable room, current variant/status/count, theme toggle, large caller display, number board, active 75-ball game stage and completed-stage progress, verified Bingo announcement, and full reverse-chronological draw history. |
 | `/admin-panel/create` | Creates a room (name, variant and, for 75-ball, game mode) and redirects to that room's game control; Cancel returns to the lobby. |
 | `/admin-panel?room=<id>` | Game control for one room, reached from the lobby's per-room Admin link or after creation. Shows the active room (name and variant), game stage/progress, draw/manual call, Bingo verification, reset, and recent calls once the room is open; a missing or invalid room ID selects no active room and redirects the admin panel to the lobby. `Space` draws outside form fields. |

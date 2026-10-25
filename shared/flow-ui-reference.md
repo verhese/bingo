@@ -2,7 +2,7 @@
 
 ## Game-session integration
 
-`useGameSession` selects a room from the page `room` query parameter, loads its initial state through `GET /api/game?sessionId=...`, then subscribes over WebSocket with `{ "action": "subscribe", "sessionId": ... }`. Missing IDs and invalid room names do not create a session; the admin panel redirects to the lobby if no valid room is selected. `getWebSocketUrl` uses `NEXT_PUBLIC_WS_URL` when present; otherwise it connects to the page hostname on port `3001`, using `wss` for HTTPS pages.
+`useGameSession` selects a room from the page `room` query parameter, loads its initial state through `GET /api/game?sessionId=...`, then subscribes over WebSocket with `{ "action": "subscribe", "sessionId": ... }`. The lobby loads its initial room summaries from `GET /api/game?rooms=true` and subscribes with `{ "action": "subscribe-lobby" }` to receive live directory updates. Missing IDs and invalid room names do not create a session; the admin panel redirects to the lobby if no valid room is selected. `getWebSocketUrl` uses `NEXT_PUBLIC_WS_URL` when present; otherwise it connects to the page hostname on port `3001`, using `wss` for HTTPS pages.
 
 The game room and admin panel both show the active room as a query parameter. The admin panel lists the available room summaries and can create a room from a name; the game room lists rooms in its session bar. A created room is inserted into the admin selector immediately, and directory refreshes make newly created rooms available in the other room selectors.
 
