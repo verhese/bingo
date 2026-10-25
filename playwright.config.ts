@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 const WEB_PORT = 3100;
 const WS_PORT = 3101;
+const CONTROL_PORT = 3102;
+const DB_PORT = 54329;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -16,11 +18,16 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: 'npx tsx src/server/ws-server.ts',
-      env: { WS_PORT: String(WS_PORT) },
-      port: WS_PORT,
+      // Throwaway PostgreSQL + game server + a control endpoint for restart/outage tests.
+      command: 'npx tsx tests/support/e2e-services.ts',
+      env: {
+        WS_PORT: String(WS_PORT),
+        E2E_CONTROL_PORT: String(CONTROL_PORT),
+        E2E_DB_PORT: String(DB_PORT),
+      },
+      port: CONTROL_PORT,
       reuseExistingServer: false,
-      timeout: 60_000,
+      timeout: 90_000,
     },
     {
       command: `npx next dev -p ${WEB_PORT}`,

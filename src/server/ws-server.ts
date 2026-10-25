@@ -1,9 +1,14 @@
+import { createServer } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { isGameVariant, VARIANTS } from '@/lib/variants';
 import { generateAllNumbers, getNextNumber } from '@/lib/bingoNumbers';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
-import { BUILT_IN_GAME_MODES, DEFAULT_GAME_MODE_ID, advanceGameModeStage, createCustomGameMode, getActiveStage, getGameModeStages } from '@/lib/gameModes';
+import { BUILT_IN_GAME_MODES, DEFAULT_GAME_MODE_ID, advanceGameModeStage, createCustomGameMode } from '@/lib/gameModes';
 import { DEFAULT_ROOM_ID, normalizeRoomId, normalizeRoomName } from '@/lib/gameRoom';
+import { createNewGame, getStages, syncStageState } from '@/lib/gameState';
+import { createRoomStore } from './storage';
+import { fromPersistedRoom, toPersistedRoom } from './storage/serialization';
+import { StorageError, describeError, type RoomStore } from './storage/types';
 import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 
 interface GameSession {
@@ -11,69 +16,13 @@ interface GameSession {
   allNumbers: number[];
 }
 
-type GameActionResult = GameState | { error: string } | null;
+type GameActionResult = GameState | { error: string; code?: string } | null;
 
-// In-memory game state store (sessionId → session data)
+const STORAGE_ERROR_MESSAGE = 'The game state could not be saved. Nothing was changed; please try again.';
+
+// Cache of every room, loaded from the room store at startup (sessionId → session data).
+// A change is committed here only after the store has accepted it.
 const gameSessions = new Map<string, GameSession>();
-
-function createNewGame(
-  variant: GameVariant = '75-ball',
-  sessionId = DEFAULT_ROOM_ID,
-  roomName = sessionId,
-  gameModeId = DEFAULT_GAME_MODE_ID,
-  customGameModes: GameState['customGameModes'] = [],
-): GameState {
-  const cfg = VARIANTS[variant];
-  if (!cfg) throw new Error(`Unknown variant: ${variant}`);
-  const effectiveGameModeId = variant === '75-ball' ? gameModeId : '';
-  const stage = getActiveStage(effectiveGameModeId, 0, customGameModes) ?? 'single-row';
-  return {
-    sessionId,
-    roomName,
-    variant,
-    gameModeId: effectiveGameModeId,
-    customGameModes,
-    mode: effectiveGameModeId,
-    selectedMode: effectiveGameModeId,
-    gameMode: effectiveGameModeId,
-    stageIndex: 0,
-    currentStageIndex: 0,
-    activeStageIndex: 0,
-    stage,
-    currentStage: stage,
-    activeStage: stage,
-    completedStages: [],
-    drawMode: null,
-    drawnNumbers: [],
-    undoneNumbers: [],
-    lastUndoneNumber: null,
-    status: 'waiting',
-    verifiedBingo: null,
-  };
-}
-
-function getStages(session: GameState) {
-  return session.variant === '75-ball'
-    ? getGameModeStages(session.gameModeId, session.customGameModes)
-    : getGameModeStages('single-row');
-}
-
-function syncStageState(session: GameState, stageIndex = session.stageIndex ?? 0) {
-  const stages = getStages(session);
-  const safeIndex = Math.max(0, Math.min(stageIndex, Math.max(0, stages.length - 1)));
-  const currentStage = stages[safeIndex] ?? 'single-row';
-
-  session.mode = session.gameModeId;
-  session.selectedMode = session.gameModeId;
-  session.gameMode = session.gameModeId;
-  session.stageIndex = safeIndex;
-  session.currentStageIndex = safeIndex;
-  session.activeStageIndex = safeIndex;
-  session.stage = currentStage;
-  session.currentStage = currentStage;
-  session.activeStage = currentStage;
-  return session;
-}
 
 function getSession(sessionId?: string): GameState | null {
   const normalizedSessionId = normalizeRoomId(sessionId);
@@ -81,18 +30,14 @@ function getSession(sessionId?: string): GameState | null {
   return session ? session.gameState : null;
 }
 
-function getOrCreateSession(sessionId?: string): GameState {
-  const normalizedSessionId = normalizeRoomId(sessionId);
-  const existingSession = getSession(normalizedSessionId);
-  if (existingSession) return existingSession;
-  const newGame = createNewGame('75-ball', normalizedSessionId, normalizedSessionId);
-  gameSessions.set(newGame.sessionId, {
-    gameState: newGame,
-    allNumbers: generateAllNumbers(VARIANTS[newGame.variant].maxNumber),
+function storeSession(gameState: GameState) {
+  gameSessions.set(gameState.sessionId, {
+    gameState,
+    allNumbers: generateAllNumbers(VARIANTS[gameState.variant].maxNumber),
   });
-  return newGame;
 }
 
+/** Builds a new room and picks its unique ID. The room is not stored until it has been persisted. */
 function createSession(
   roomName?: string,
   variant: GameVariant = '75-ball',
@@ -120,16 +65,10 @@ function createSession(
     sessionId = `${baseId}-${suffix}`;
     suffix += 1;
   }
-  const gameState = createNewGame(variant, sessionId, normalizedRoomName, selectedGameModeId, customGameModes);
-  gameSessions.set(sessionId, {
-    gameState,
-    allNumbers: generateAllNumbers(VARIANTS[gameState.variant].maxNumber),
-  });
-  return gameState;
+  return createNewGame(variant, sessionId, normalizedRoomName, selectedGameModeId, customGameModes);
 }
 
 function getSessionSummaries(): RoomSummary[] {
-  getOrCreateSession();
   return Array.from(gameSessions.values(), ({ gameState }) => ({
     sessionId: gameState.sessionId,
     roomName: gameState.roomName,
@@ -140,12 +79,12 @@ function getSessionSummaries(): RoomSummary[] {
 }
 
 const port = Number(process.env.WS_PORT ?? 3001);
-const wss = new WebSocketServer({ port });
+let store: RoomStore;
+// The socket server is attached to an HTTP server that only listens once storage is ready.
+const httpServer = createServer();
+const wss = new WebSocketServer({ noServer: true });
 const clientSessionIds = new WeakMap<WebSocket, string>();
 const lobbySubscribers = new Set<WebSocket>();
-
-console.log(`Bingo WebSocket server running on ws://localhost:${port}`);
-
 function broadcastSessionState(gameState: GameState, sender: WebSocket) {
   const message = JSON.stringify(gameState);
   wss.clients.forEach((client) => {
@@ -203,10 +142,10 @@ function handleGameAction(
     return createSession(parsed.roomName, parsed.variant, parsed.gameModeId, parsed.gameModeName, parsed.patterns);
   }
 
-  const session = getSession(parsed.sessionId);
-  if (!session) return { error: 'Room not found.' };
-  const sessionData = gameSessions.get(session.sessionId);
+  const sessionData = gameSessions.get(normalizeRoomId(parsed.sessionId));
   if (!sessionData) return { error: 'Room not found.' };
+  // Work on a copy: the stored room is replaced only after the new state has been persisted.
+  const session = structuredClone(sessionData.gameState);
 
   if (parsed.action === 'undo-last-draw') return undoLastDraw(session, parsed.number);
 
@@ -298,14 +237,52 @@ function handleGameAction(
     resetGame.gameModeId = session.variant === '75-ball' ? session.gameModeId : '';
     resetGame.customGameModes = session.variant === '75-ball' ? session.customGameModes : [];
     syncStageState(resetGame, 0);
-    gameSessions.set(session.sessionId, {
-      gameState: resetGame,
-      allNumbers: generateAllNumbers(VARIANTS[resetGame.variant].maxNumber),
-    });
     return resetGame;
   }
 
   return null;
+}
+
+const roomLocks = new Map<string, Promise<unknown>>();
+
+/** Runs actions for one key strictly one after another, so a persisted change never interleaves with another. */
+function runExclusive<T>(key: string, task: () => Promise<T>): Promise<T> {
+  const previous = roomLocks.get(key) ?? Promise.resolve();
+  const next = previous.then(task, task);
+  const tail = next.catch(() => undefined);
+  roomLocks.set(key, tail);
+  void tail.then(() => {
+    if (roomLocks.get(key) === tail) roomLocks.delete(key);
+  });
+  return next;
+}
+
+/** Applies an action and persists the result before it becomes visible to any client. */
+function applyGameAction(parsed: Parameters<typeof handleGameAction>[0]): Promise<GameActionResult> {
+  const lockKey = parsed.action === 'create-session' ? '\0create' : normalizeRoomId(parsed.sessionId);
+  return runExclusive(lockKey, async () => {
+    const result = handleGameAction(parsed);
+    if (!result || 'error' in result) return result;
+
+    try {
+      if (parsed.action === 'create-session') {
+        const created = await store.createRoom(toPersistedRoom(result));
+        if (!created) return { error: 'A room with that ID already exists. Please try again.' };
+      } else {
+        await store.saveRoom(toPersistedRoom(result));
+      }
+    } catch (error) {
+      reportStorageFailure(parsed.action, error);
+      return { error: STORAGE_ERROR_MESSAGE, code: 'storage-error' };
+    }
+    storeSession(result);
+    return result;
+  });
+}
+
+function reportStorageFailure(action: string, error: unknown) {
+  const code = error instanceof StorageError ? error.code : 'unknown';
+  console.error(`Storage failure during "${action}" [${code}]: ${describeError(error)}`);
 }
 
 wss.on('connection', (ws: WebSocket) => {
@@ -362,17 +339,22 @@ wss.on('connection', (ws: WebSocket) => {
       return;
     }
 
-    const actionResult = handleGameAction(parsed);
+    void (async () => {
+      let actionResult: GameActionResult;
+      try {
+        actionResult = await applyGameAction(parsed);
+      } catch (error) {
+        console.error('Unexpected failure handling action:', error instanceof Error ? error.message : error);
+        actionResult = { error: 'The action could not be completed.' };
+      }
 
-    if (!actionResult) return;
-    if ('error' in actionResult) {
-      ws.send(JSON.stringify(actionResult));
-      return;
-    }
+      if (!actionResult) return;
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(actionResult));
+      if ('error' in actionResult) return;
 
-    ws.send(JSON.stringify(actionResult));
-    broadcastSessionState(actionResult, ws);
-    broadcastSessionSummaries();
+      broadcastSessionState(actionResult, ws);
+      broadcastSessionSummaries();
+    })();
   });
 
   ws.on('close', () => {
@@ -385,8 +367,41 @@ wss.on('connection', (ws: WebSocket) => {
   });
 });
 
-process.on('SIGINT', () => {
+/** Loads persisted rooms, makes sure the default room exists, then starts accepting connections. */
+async function start() {
+  store = createRoomStore();
+  await store.init();
+
+  for (const room of await store.loadRooms()) storeSession(fromPersistedRoom(room));
+  if (!gameSessions.has(DEFAULT_ROOM_ID)) {
+    const defaultRoom = createNewGame('75-ball', DEFAULT_ROOM_ID, DEFAULT_ROOM_ID);
+    await store.createRoom(toPersistedRoom(defaultRoom));
+    storeSession(defaultRoom);
+  }
+  console.log(`Restored ${gameSessions.size} room(s) from storage`);
+
+  httpServer.on('upgrade', (request, socket, head) => {
+    wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request));
+  });
+  await new Promise<void>((resolve, reject) => {
+    httpServer.once('error', reject);
+    httpServer.listen(port, resolve);
+  });
+  console.log(`Bingo WebSocket server running on ws://localhost:${port}`);
+}
+
+async function shutdown() {
   console.log('\nShutting down WebSocket server...');
   wss.close();
+  httpServer.close();
+  await store?.close().catch(() => undefined);
   process.exit(0);
+}
+
+process.on('SIGINT', () => void shutdown());
+process.on('SIGTERM', () => void shutdown());
+
+start().catch((error) => {
+  console.error(`Bingo WebSocket server could not start: ${describeError(error)}`);
+  process.exit(1);
 });

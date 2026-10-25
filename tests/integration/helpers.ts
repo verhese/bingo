@@ -1,11 +1,22 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import WebSocket from 'ws';
+import { startTestDatabase, type TestDatabase } from '../support/postgres';
 
 export interface TestServer {
   readonly port: number;
   readonly url: string;
+  /** The database behind this server when the helper started it; null when one was supplied. */
+  readonly database: TestDatabase | null;
+  /** Everything the server has written to stdout and stderr so far. */
+  logs(): string;
   stop(): Promise<void>;
+}
+
+export interface StartGameServerOptions {
+  /** Use an existing database (kept after stop). By default a throwaway one is created and removed on stop. */
+  databaseUrl?: string;
+  env?: Record<string, string | undefined>;
 }
 
 export async function getFreePort(): Promise<number> {
@@ -19,12 +30,38 @@ export async function getFreePort(): Promise<number> {
   });
 }
 
-export async function startGameServer(): Promise<TestServer> {
+/** Spawns the game server, resolving once it is accepting connections or rejecting with its exit status. */
+export async function startGameServer(options: StartGameServerOptions = {}): Promise<TestServer> {
+  const database = options.databaseUrl ? null : await startTestDatabase();
+  const databaseUrl = options.databaseUrl ?? database!.url;
+  let server: Awaited<ReturnType<typeof spawnGameServer>>;
+  try {
+    server = await spawnGameServer({ ...options.env, DATABASE_URL: databaseUrl });
+  } catch (error) {
+    await database?.dispose();
+    throw error;
+  }
+  return {
+    port: server.port,
+    url: server.url,
+    database,
+    logs: server.logs,
+    async stop() {
+      await server.stop();
+      await database?.dispose();
+    },
+  };
+}
+
+export async function spawnGameServer(env: Record<string, string | undefined> = {}) {
   const port = await getFreePort();
   const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', 'src/server/ws-server.ts'], {
-    env: { ...process.env, WS_PORT: String(port) },
-    stdio: ['ignore', 'pipe', 'inherit'],
+    env: { ...process.env, ...env, WS_PORT: String(port) },
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
+  const logs: string[] = [];
+  child.stdout?.on('data', (chunk: Buffer) => logs.push(chunk.toString()));
+  child.stderr?.on('data', (chunk: Buffer) => logs.push(chunk.toString()));
 
   await new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -42,7 +79,7 @@ export async function startGameServer(): Promise<TestServer> {
       if (child.exitCode === null && child.signalCode === null) child.kill();
       reject(error);
     }
-    const onExit = (code: number | null) => fail(new Error(`Game server exited early (${code})`));
+    const onExit = (code: number | null) => fail(new Error(`Game server exited early (${code}): ${logs.join('').trim()}`));
     const onError = (error: Error) => fail(error);
     const onData = (chunk: Buffer) => {
       if (chunk.toString().includes('running on')) {
@@ -53,7 +90,7 @@ export async function startGameServer(): Promise<TestServer> {
       }
     };
 
-    timer = setTimeout(() => fail(new Error('Game server did not start in time')), 20_000);
+    timer = setTimeout(() => fail(new Error(`Game server did not start in time: ${logs.join('').trim()}`)), 30_000);
     child.once('exit', onExit);
     child.once('error', onError);
     child.stdout?.on('data', onData);
@@ -62,6 +99,7 @@ export async function startGameServer(): Promise<TestServer> {
   return {
     port,
     url: `ws://localhost:${port}`,
+    logs: () => logs.join(''),
     stop: () => new Promise<void>((resolve) => {
       if (child.exitCode !== null || child.signalCode !== null) return resolve();
       child.once('exit', () => resolve());
