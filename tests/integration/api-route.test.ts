@@ -111,6 +111,33 @@ describe('HTTP API /api/game', () => {
     assert.deepEqual((await get(`sessionId=${b}`)).body.gameState.drawnNumbers, [2]);
   });
 
+  it('reports a storage failure as 503 without changing the room, then recovers', async () => {
+    const id = await createRoom('Api storage');
+    await post({ action: 'call-number', sessionId: id, number: 4 });
+
+    await server.database!.pause();
+    try {
+      const failed = await post({ action: 'call-number', sessionId: id, number: 5 });
+      assert.equal(failed.status, 503);
+      assert.equal(failed.body.code, 'storage-error');
+      assert.match(failed.body.error, /could not be saved/i);
+      assert.doesNotMatch(JSON.stringify(failed.body), /ECONNREFUSED|postgres|bingo-test/i);
+
+      const created = await post({ action: 'create-session', roomName: 'Api storage never' });
+      assert.equal(created.status, 503);
+      assert.equal(created.body.code, 'storage-error');
+
+      assert.deepEqual((await get(`sessionId=${id}`)).body.gameState.drawnNumbers, [4]);
+      assert.ok(!(await get('rooms=true')).body.sessions.some((room: { sessionId: string }) => room.sessionId === 'api-storage-never'));
+    } finally {
+      await server.database!.resume();
+    }
+
+    const retried = await post({ action: 'call-number', sessionId: id, number: 5 });
+    assert.equal(retried.status, 200);
+    assert.deepEqual(retried.body.gameState.drawnNumbers, [4, 5]);
+  });
+
   it('reports 503 when the game service is unavailable', async () => {
     await server.stop();
     assert.equal((await get('rooms=true')).status, 503);

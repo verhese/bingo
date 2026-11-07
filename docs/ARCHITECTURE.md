@@ -2,7 +2,7 @@
 
 ## Overview
 
-Bingo is a Next.js App Router application backed by a separate Node WebSocket service. The WebSocket service owns the in-memory game state for every room. The Next.js HTTP route provides a validated command and snapshot interface, while browser clients receive live updates by subscribing directly to the service.
+Bingo is a Next.js App Router application backed by a separate Node WebSocket service. The WebSocket service owns the game state for every room, caching it in memory and persisting every change to PostgreSQL before applying it (see [PERSISTENCE.md](PERSISTENCE.md)). The Next.js HTTP route provides a validated command and snapshot interface, while browser clients receive live updates by subscribing directly to the service.
 
 ```mermaid
 flowchart LR
@@ -30,7 +30,7 @@ flowchart LR
 
 The `room` browser query parameter corresponds to the API and WebSocket `sessionId`. `normalizeRoomId` accepts lower-case IDs of up to 32 characters containing letters, numbers, and hyphens; invalid or omitted values fall back to `default` only for display, but the admin panel treats that as a missing room and redirects to the lobby instead of creating a new session.
 
-Each `GameState` contains a session ID, display name, variant, selected game-mode ID, room-local custom game modes, ordered `drawnNumbers`, status, and optional verified Bingo line. Game modes are available only for 75-ball rooms; Single Row is the default, and Standard is Top Row, Bottom Row, Sint-Andreas Cross, then Full Card. Custom modes are held in process memory with their room and are lost when the service restarts. A reset keeps the variant, selected mode, and custom modes but clears all calls. Changing a variant also clears all calls.
+Each `GameState` contains a session ID, display name, variant, selected game-mode ID, room-local custom game modes, ordered `drawnNumbers`, status, and optional verified Bingo line. Game modes are available only for 75-ball rooms; Single Row is the default, and Standard is Top Row, Bottom Row, Sint-Andreas Cross, then Full Card. Custom modes are stored with their room and survive restarts. A reset keeps the variant, selected mode, and custom modes but clears all calls. Changing a variant also clears all calls.
 
 The service keeps sessions in a process-local `Map`. It does not use a database, so service restarts discard room sessions, their names, and their history. It also has no authentication or authorization mechanism.
 

@@ -2,7 +2,7 @@
 
 ## Service model
 
-The public HTTP API is `/api/game`. Its implementation communicates with the WebSocket game service at `GAME_SERVER_WS_URL`, which defaults to `ws://localhost:3001`; Docker Compose sets it to `ws://ws-server:3001` inside the container network. The game service holds room sessions in memory only.
+The public HTTP API is `/api/game`. Its implementation communicates with the WebSocket game service at `GAME_SERVER_WS_URL`, which defaults to `ws://localhost:3001`; Docker Compose sets it to `ws://ws-server:3001` inside the container network. The game service stores rooms in PostgreSQL (see `docs/PERSISTENCE.md`) and writes each change before applying or broadcasting it. If a change cannot be stored, the route responds `503` with `{ "error": "...", "code": "storage-error" }` and the room is left unchanged; the request can be retried.
 
 All HTTP actions return `503` with `{ "error": "Game service is unavailable" }` when the service cannot be reached. Invalid input returns `400` with an `error` string.
 
@@ -39,7 +39,7 @@ All HTTP actions return `503` with `{ "error": "Game service is unavailable" }` 
 ```
 
 `variant` is `90-ball`, `75-ball`, or `speedy`; their maximum numbers are 90, 75, and 30 respectively. `status` is `waiting`, `in-play`, or `complete`. `verifiedBingo` is `null` until a valid claim is accepted.
-`gameModeId` defaults to `single-row`. The built-in modes are `single-row` and `standard`; `customGameModes` lists the optional custom mode configured when the room was created. Each mode has an `id`, `name`, and ordered `patterns` array. The room's selected mode is immutable after creation, including after reset. Custom modes are in-memory only and do not survive a game-service restart.
+`gameModeId` defaults to `single-row`. The built-in modes are `single-row` and `standard`; `customGameModes` lists the optional custom mode configured when the room was created. Each mode has an `id`, `name`, and ordered `patterns` array. The room's selected mode is immutable after creation, including after reset. Custom modes are stored with their room and survive game-service restarts.
 `mode`, `selectedMode`, and `gameMode` mirror `gameModeId`. `stageIndex`/`currentStage` identify the currently active bingo stage in the selected ordered mode; `completedStages` tracks prior stage confirmations. Reset and variant changes clear the stage state.
 `drawMode` is `null` before the first accepted call, then `auto` for random draws or `manual` for caller-entered numbers. Reset and variant changes clear the mode.
 `undoneNumbers` contains calls removed with undo; those numbers remain marked on the board until called again. Reset and variant changes clear this list.

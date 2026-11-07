@@ -21,10 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Manual number calls and Bingo-claim verification
 - High-contrast light theme with persisted dark-theme option
 - Docker Compose deployment for the web app and WebSocket service
+- Durable PostgreSQL storage for rooms and game state, restored when the game service restarts (see `docs/PERSISTENCE.md`)
 
 ### Changed
 
-- Reworked game state from a single session to in-memory, room-scoped WebSocket sessions.
+- Reworked game state from a single session to room-scoped WebSocket sessions.
+- **Breaking:** the game service requires `DATABASE_URL`, and Docker Compose requires `POSTGRES_PASSWORD`. Rooms that existed only in memory before this change are not migrated.
+- A change that cannot be stored is rejected with a `storage-error` response (HTTP `503` from `/api/game`) instead of being applied.
 
 ### Deprecated
 

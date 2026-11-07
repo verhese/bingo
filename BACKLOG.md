@@ -52,7 +52,7 @@
 
 - [ ] Add automated unit, integration, and end-to-end tests. No test scripts currently exist in `package.json`.
 - [ ] Complete an accessibility audit, including screen-reader and keyboard-only manual testing.
-- [ ] Add durable session storage for rooms and calls. Sessions are currently in memory only.
+- [x] Add durable session storage for rooms and calls (PostgreSQL; see `docs/PERSISTENCE.md`).
 - [ ] Define and implement authentication and access control for caller controls. The current admin route has no authentication layer.
 - [ ] Improve production operations: health checks, structured logging, and a deployment/runbook validation pass.
 
@@ -62,7 +62,7 @@
 |---|---|---|
 | App routes | `src/app/` | `/` redirects to `/game-room`; game room, admin panel, and player cards use the App Router. |
 | HTTP game API | `src/app/api/game/route.ts` | Re-exports the implementation from `src/server/api/game/route.ts`. |
-| Game authority | `src/server/ws-server.ts` | In-memory room sessions; port `3001` by default or `WS_PORT`. |
+| Game authority | `src/server/ws-server.ts` | Room sessions cached in memory, persisted to PostgreSQL; port `3001` by default or `WS_PORT`. |
 | Client state | `src/lib/useGameSession.ts` | Fetches an initial HTTP snapshot and subscribes to the selected room over WebSocket. |
 | Components | `src/components/` | Board, caller display, history, recent calls, session bar, theme toggle, and variant selector. |
 | Shared contracts | `shared/` | Keep both flow references in sync when API or UI behavior changes. |

@@ -9,10 +9,12 @@ import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 const WS_URL = process.env.GAME_SERVER_WS_URL || 'ws://localhost:3001';
 
 class GameActionRejectedError extends Error {}
+class GameStorageError extends Error {}
 
 function parseGameResponse(data: RawData): GameState {
-  const response = JSON.parse(parseResponseText(data)) as GameState | { error?: unknown };
+  const response = JSON.parse(parseResponseText(data)) as GameState | { error?: unknown; code?: unknown };
   if ('error' in response && typeof response.error === 'string') {
+    if (response.code === 'storage-error') throw new GameStorageError(response.error);
     throw new GameActionRejectedError(response.error);
   }
   return response as GameState;
@@ -204,6 +206,9 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ gameState });
   } catch (error) {
+    if (error instanceof GameStorageError) {
+      return NextResponse.json({ error: error.message, code: 'storage-error' }, { status: 503 });
+    }
     if (error instanceof GameActionRejectedError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
