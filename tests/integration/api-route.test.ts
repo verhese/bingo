@@ -32,10 +32,14 @@ async function post(body: unknown, authenticated = true) {
   return { status: response.status, body: await response.json() as Record<string, any> };
 }
 
-async function login(password: string) {
+async function login(password: string, clientIp = '127.0.0.1') {
   return loginRoute.POST(new NextRequest('http://localhost/api/auth/login', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: 'http://localhost',
+      'X-Forwarded-For': clientIp,
+    },
     body: JSON.stringify({ password }),
   }));
 }
@@ -93,6 +97,18 @@ describe('HTTP API /api/game', () => {
       body: JSON.stringify({ action: 'reset', sessionId: 'default' }),
     }));
     assert.equal(crossOrigin.status, 403);
+  });
+
+  it('limits administrator login attempts per client', async () => {
+    const clientIp = '192.0.2.1';
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      assert.equal((await login('incorrect password', clientIp)).status, 401);
+    }
+
+    const limited = await login(TEST_ADMIN_PASSWORD, clientIp);
+    assert.equal(limited.status, 429);
+    assert.ok(Number(limited.headers.get('Retry-After')) > 0);
+    assert.equal((await login(TEST_ADMIN_PASSWORD, '192.0.2.2')).status, 200);
   });
 
   it('creates a room and exposes it through the room list and state endpoints', async () => {

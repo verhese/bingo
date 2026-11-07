@@ -3,6 +3,41 @@ import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 export const ADMIN_SESSION_COOKIE = 'bingo-admin-session';
 export const ADMIN_SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
 
+const ADMIN_LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const ADMIN_LOGIN_MAX_ATTEMPTS = 5;
+const ADMIN_LOGIN_MAX_CLIENTS = 10_000;
+const adminLoginAttempts = new Map<string, { attempts: number; resetAt: number }>();
+
+function removeExpiredAdminLoginAttempts(now: number): void {
+  for (const [client, attempt] of adminLoginAttempts) {
+    if (attempt.resetAt <= now) adminLoginAttempts.delete(client);
+  }
+}
+
+export function consumeAdminLoginAttempt(client: string, now = Date.now()): number | null {
+  removeExpiredAdminLoginAttempts(now);
+  const attempt = adminLoginAttempts.get(client);
+  if (attempt && attempt.attempts >= ADMIN_LOGIN_MAX_ATTEMPTS) {
+    return Math.ceil((attempt.resetAt - now) / 1000);
+  }
+  if (!attempt && adminLoginAttempts.size >= ADMIN_LOGIN_MAX_CLIENTS) {
+    return Math.ceil(ADMIN_LOGIN_ATTEMPT_WINDOW_MS / 1000);
+  }
+  if (attempt) {
+    attempt.attempts += 1;
+  } else {
+    adminLoginAttempts.set(client, {
+      attempts: 1,
+      resetAt: now + ADMIN_LOGIN_ATTEMPT_WINDOW_MS,
+    });
+  }
+  return null;
+}
+
+export function clearAdminLoginAttempts(client: string): void {
+  adminLoginAttempts.delete(client);
+}
+
 function getSessionSecret(): string | null {
   const secret = process.env.ADMIN_SESSION_SECRET;
   return secret && Buffer.byteLength(secret) >= 32 ? secret : null;

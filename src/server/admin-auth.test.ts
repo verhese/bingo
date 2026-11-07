@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import {
+  clearAdminLoginAttempts,
+  consumeAdminLoginAttempt,
   createAdminSessionToken,
   isAdminAuthConfigured,
   isSameOrigin,
@@ -46,5 +48,17 @@ describe('administrator authentication', () => {
     assert.equal(isSameOrigin('https://bingo.example', 'https://bingo.example'), true);
     assert.equal(isSameOrigin('https://attacker.example', 'https://bingo.example'), false);
     assert.equal(isSameOrigin(null, 'https://bingo.example'), false);
+  });
+
+  it('limits login attempts within a window and resets after it expires', () => {
+    const client = 'admin-auth-rate-limit-test';
+    const now = 1_800_000_000_000;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      assert.equal(consumeAdminLoginAttempt(client, now), null);
+    }
+
+    assert.equal(consumeAdminLoginAttempt(client, now), 15 * 60);
+    assert.equal(consumeAdminLoginAttempt(client, now + 15 * 60 * 1000), null);
+    clearAdminLoginAttempts(client);
   });
 });
