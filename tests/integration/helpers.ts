@@ -56,7 +56,7 @@ export async function startGameServer(options: StartGameServerOptions = {}): Pro
 export async function spawnGameServer(env: Record<string, string | undefined> = {}) {
   const port = await getFreePort();
   const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', 'src/server/ws-server.ts'], {
-    env: { ...process.env, ...env, WS_PORT: String(port) },
+    env: { ...process.env, DATABASE_PASSWORD: undefined, ...env, WS_PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const logs: string[] = [];

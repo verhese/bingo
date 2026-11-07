@@ -170,6 +170,15 @@ describe('game server (WebSocket)', () => {
       assert.deepEqual((await send({ action: 'ping', sessionId: room.sessionId }))?.drawnNumbers, [42]);
     });
 
+    it('rejects direct calls outside the room variant range', async () => {
+      const room = await createRoom('Speedy range', 'single-row', { variant: 'speedy' });
+      for (const number of [0, 31, 1.5]) {
+        const rejected = await send<ErrorResult>({ action: 'call-number', sessionId: room.sessionId, number });
+        assert.match(rejected?.error ?? '', /whole number from 1 to 30/i);
+      }
+      assert.deepEqual((await send({ action: 'ping', sessionId: room.sessionId }))?.drawnNumbers, []);
+    });
+
     it('finishes the game when every number has been drawn', async () => {
       const room = await createRoom('Exhaust', 'single-row', { variant: 'speedy' });
       for (let i = 0; i < 31; i += 1) await send({ action: 'draw', sessionId: room.sessionId });

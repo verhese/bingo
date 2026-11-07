@@ -48,16 +48,20 @@ describe('room serialization', () => {
 
   it('rejects damaged stored rooms instead of loading them', () => {
     const valid = toPersistedRoom(playedRoom());
+    const speedy = toPersistedRoom(createNewGame('speedy', 'speedy', 'Speedy'));
     const damaged: Partial<PersistedRoom>[] = [
       { variant: 'bogus' as PersistedRoom['variant'] },
       { status: 'finished' as PersistedRoom['status'] },
       { drawMode: 'both' as PersistedRoom['drawMode'] },
       { drawnNumbers: [1, 1] },
       { drawnNumbers: [1.5] },
+      { drawnNumbers: [76] },
+      { ...speedy, drawnNumbers: [31] },
       { stageIndex: -1 },
       { stageIndex: 999 },
       { completedStages: ['nope' as PersistedRoom['completedStages'][number]] },
       { customGameModes: [{ id: 1 }] as unknown as PersistedRoom['customGameModes'] },
+      { gameModeId: 'unknown' },
       { verifiedBingo: { claimedNumbers: ['x'] } as unknown as PersistedRoom['verifiedBingo'] },
     ];
     for (const change of damaged) {

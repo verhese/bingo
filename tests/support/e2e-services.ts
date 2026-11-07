@@ -20,7 +20,7 @@ let gameServer: ChildProcess | undefined;
 function startGameServer(): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['--import', 'tsx', 'src/server/ws-server.ts'], {
-      env: { ...process.env, DATABASE_URL: database.url, WS_PORT: String(WS_PORT) },
+      env: { ...process.env, DATABASE_PASSWORD: undefined, DATABASE_URL: database.url, WS_PORT: String(WS_PORT) },
       stdio: ['ignore', 'pipe', 'inherit'],
     });
     gameServer = child;

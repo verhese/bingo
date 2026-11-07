@@ -191,6 +191,10 @@ function handleGameAction(
   }
 
   if (parsed.action === 'call-number' && typeof parsed.number === 'number') {
+    const maxNumber = VARIANTS[session.variant].maxNumber;
+    if (!Number.isInteger(parsed.number) || parsed.number < 1 || parsed.number > maxNumber) {
+      return { error: `Enter a whole number from 1 to ${maxNumber}.` };
+    }
     if (session.drawnNumbers.includes(parsed.number)) {
       return { error: 'That number has already been called.' };
     }

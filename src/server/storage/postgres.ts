@@ -110,7 +110,7 @@ export class PostgresRoomStore implements RoomStore {
     let poolConnectionString = connectionString;
     if (password !== undefined) {
       const url = new URL(connectionString);
-      url.password = password;
+      url.password = encodeURIComponent(password);
       poolConnectionString = url.href;
     }
     this.pool = new Pool({

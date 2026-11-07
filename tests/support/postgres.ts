@@ -14,7 +14,7 @@ export interface TestDatabase {
 }
 
 const USER = 'bingo';
-const PASSWORD = 'bingo/?:#test';
+const PASSWORD = 'bingo-test%/?:#';
 
 async function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
