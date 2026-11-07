@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Invalid JSON request body.' }, { status: 400 });
   }
-  if (!verifyAdminPassword(body.password)) {
+  if (!verifyAdminPassword(body?.password)) {
     return NextResponse.json({ error: 'Incorrect password.' }, { status: 401 });
   }
 
