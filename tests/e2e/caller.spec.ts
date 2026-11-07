@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 async function createRoom(page: Page, name: string, mode: string) {
   await page.goto('/admin-panel/create');

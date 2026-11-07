@@ -2,19 +2,42 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { NextRequest } from 'next/server';
 import { startGameServer, type TestServer } from './helpers';
+import {
+  TEST_ADMIN_PASSWORD,
+  TEST_ADMIN_SESSION_SECRET,
+  TEST_INTERNAL_API_TOKEN,
+} from '../support/test-auth';
 
 type Route = typeof import('../../src/app/api/game/route');
+type LoginRoute = typeof import('../../src/app/api/auth/login/route');
 
 let server: TestServer;
 let route: Route;
+let loginRoute: LoginRoute;
+let adminSessionCookie = '';
 
-async function post(body: unknown) {
+async function post(body: unknown, authenticated = true) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Origin: 'http://localhost',
+  };
+  if (authenticated && adminSessionCookie) {
+    headers.Cookie = `bingo-admin-session=${adminSessionCookie}`;
+  }
   const response = await route.POST(new NextRequest('http://localhost/api/game', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
   }));
   return { status: response.status, body: await response.json() as Record<string, any> };
+}
+
+async function login(password: string) {
+  return loginRoute.POST(new NextRequest('http://localhost/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
+    body: JSON.stringify({ password }),
+  }));
 }
 
 async function get(query: string) {
@@ -32,9 +55,15 @@ const range = (from: number, to: number) => Array.from({ length: to - from + 1 }
 
 describe('HTTP API /api/game', () => {
   before(async () => {
+    process.env.ADMIN_PASSWORD = TEST_ADMIN_PASSWORD;
+    process.env.ADMIN_SESSION_SECRET = TEST_ADMIN_SESSION_SECRET;
+    process.env.INTERNAL_API_TOKEN = TEST_INTERNAL_API_TOKEN;
     server = await startGameServer();
     process.env.GAME_SERVER_WS_URL = server.url;
     route = await import('../../src/app/api/game/route');
+    loginRoute = await import('../../src/app/api/auth/login/route');
+    const response = await login(TEST_ADMIN_PASSWORD);
+    adminSessionCookie = response.cookies.get('bingo-admin-session')?.value ?? '';
   });
   after(async () => {
     await server.stop();
@@ -46,6 +75,24 @@ describe('HTTP API /api/game', () => {
     assert.equal((await post({ action: 'change-variant', variant: 'bogus' })).status, 409);
     assert.equal((await post({ action: 'create-session', variant: 'toString' })).status, 400);
     assert.equal((await post({ action: 'change-variant', variant: '90-ball' })).status, 409);
+  });
+
+  it('requires a valid administrator session and same-origin requests for mutations', async () => {
+    assert.equal((await post({ action: 'reset', sessionId: 'default' }, false)).status, 401);
+    const wrongPassword = await login('incorrect password');
+    assert.equal(wrongPassword.status, 401);
+    assert.ok(adminSessionCookie);
+
+    const crossOrigin = await route.POST(new NextRequest('http://localhost/api/game', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://attacker.example',
+        Cookie: `bingo-admin-session=${adminSessionCookie}`,
+      },
+      body: JSON.stringify({ action: 'reset', sessionId: 'default' }),
+    }));
+    assert.equal(crossOrigin.status, 403);
   });
 
   it('creates a room and exposes it through the room list and state endpoints', async () => {

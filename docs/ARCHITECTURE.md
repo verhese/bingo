@@ -6,9 +6,10 @@ Bingo is a Next.js App Router application backed by a separate Node WebSocket se
 
 ```mermaid
 flowchart LR
-  Admin[Admin panel] -->|HTTP POST /api/game| Api[Next.js game route]
+  Admin[Admin panel] -->|Administrator session| Api[Next.js game route]
+  Login[Administrator login] -->|Password| Api
   Room[Game room] -->|HTTP GET /api/game| Api
-  Api -->|WebSocket command| Service[WebSocket game service]
+  Api -->|Private token + command| Service[WebSocket game service]
   Admin -->|subscribe| Service
   Room -->|subscribe| Service
   Service -->|room-scoped GameState| Admin
@@ -22,6 +23,7 @@ flowchart LR
 | Next.js pages | `src/app/` | Renders `/game-room`, `/admin-panel`, `/admin-panel/create`, and `/player-card`; `/` redirects to the game room. |
 | HTTP game route | `src/server/api/game/route.ts` | Validates public API calls and proxies them to the WebSocket service. Re-exported at `src/app/api/game/route.ts`. |
 | Game service | `src/server/ws-server.ts` | Creates, stores, mutates, and broadcasts isolated room sessions. Listens on `WS_PORT` or `3001`. |
+| Administrator auth | `src/server/admin-auth.ts` | Verifies the signed admin cookie, same-origin requests, and private web-to-service token. |
 | Session hook | `src/lib/useGameSession.ts` | Fetches an initial state from the HTTP API and sends a WebSocket `subscribe` message for updates. |
 | Lobby | `src/app/lobby/page.tsx` | Fetches an initial room directory and subscribes over WebSocket for live summary updates. |
 | Game-domain modules | `src/lib/` | Defines variants, number selection, card generation, room normalization, and Bingo-claim validation. |
@@ -32,7 +34,9 @@ The `room` browser query parameter corresponds to the API and WebSocket `session
 
 Each `GameState` contains a session ID, display name, variant, selected game-mode ID, room-local custom game modes, ordered `drawnNumbers`, status, and optional verified Bingo line. Game modes are available only for 75-ball rooms; Single Row is the default, and Standard is Top Row, Bottom Row, Sint-Andreas Cross, then Full Card. Custom modes are stored with their room and survive restarts. A reset keeps the variant, selected mode, and custom modes but clears all calls. Changing a variant also clears all calls.
 
-The service keeps sessions in a process-local `Map`. It does not use a database, so service restarts discard room sessions, their names, and their history. It also has no authentication or authorization mechanism.
+The service keeps sessions in a process-local `Map` backed by PostgreSQL persistence. Public WebSocket clients may read room state and summaries, but cannot mutate rooms; mutation messages require the private token shared by the web and game-service containers. Admin pages and HTTP mutations require an administrator password session.
+
+`ADMIN_PASSWORD` must contain at least 16 characters. `ADMIN_SESSION_SECRET` and `INTERNAL_API_TOKEN` must each contain at least 32 bytes and should be independently generated. The admin session cookie is HttpOnly, SameSite=Strict, signed, and expires after eight hours. Never expose the internal token through `WS_PUBLIC_URL` or client-side configuration.
 
 ## Client surfaces
 

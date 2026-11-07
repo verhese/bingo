@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
+import {
+  TEST_ADMIN_PASSWORD,
+  TEST_ADMIN_SESSION_SECRET,
+  TEST_INTERNAL_API_TOKEN,
+} from './tests/support/test-auth';
 
 const WEB_PORT = 3100;
 const WS_PORT = 3101;
@@ -24,6 +29,7 @@ export default defineConfig({
         WS_PORT: String(WS_PORT),
         E2E_CONTROL_PORT: String(CONTROL_PORT),
         E2E_DB_PORT: String(DB_PORT),
+        INTERNAL_API_TOKEN: TEST_INTERNAL_API_TOKEN,
       },
       port: CONTROL_PORT,
       reuseExistingServer: false,
@@ -34,6 +40,9 @@ export default defineConfig({
       env: {
         WS_PUBLIC_URL: `ws://localhost:${WS_PORT}`,
         GAME_SERVER_WS_URL: `ws://localhost:${WS_PORT}`,
+        ADMIN_PASSWORD: TEST_ADMIN_PASSWORD,
+        ADMIN_SESSION_SECRET: TEST_ADMIN_SESSION_SECRET,
+        INTERNAL_API_TOKEN: TEST_INTERNAL_API_TOKEN,
         NEXT_DIST_DIR: '.next-e2e',
       },
       url: `http://localhost:${WEB_PORT}`,

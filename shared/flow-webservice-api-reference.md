@@ -5,6 +5,7 @@
 The public HTTP API is `/api/game`. Its implementation communicates with the WebSocket game service at `GAME_SERVER_WS_URL`, which defaults to `ws://localhost:3001`; Docker Compose sets it to `ws://ws-server:3001` inside the container network. The game service stores rooms in PostgreSQL (see `docs/PERSISTENCE.md`) and writes each change before applying or broadcasting it. If a change cannot be stored, the route responds `503` with `{ "error": "...", "code": "storage-error" }` and the room is left unchanged; the request can be retried.
 
 All HTTP actions return `503` with `{ "error": "Game service is unavailable" }` when the service cannot be reached. Invalid input returns `400` with an `error` string.
+`POST /api/game` requires a valid administrator session cookie and a same-origin `Origin` header; unauthorized requests return `401`, and cross-origin requests return `403`. Sign in with `POST /api/auth/login` using `{ "password": "..." }`; the server sets a signed, HttpOnly session cookie. `POST /api/auth/logout` expires the session cookie.
 
 `sessionId` is optional. Missing or invalid IDs resolve to `default`; valid IDs are lower-case, begin with a letter or digit, contain only letters, digits, and hyphens, and are at most 32 characters.
 
@@ -65,7 +66,7 @@ Returns `{ "sessions": RoomSummary[] }`, sorted by room name. The default room i
 
 ### `POST /api/game`
 
-Send JSON with one of the following actions. A successful response is always `{ "gameState": GameState }`.
+Send JSON with one of the following actions while signed in as an administrator. A successful response is always `{ "gameState": GameState }`.
 
 | Request | Effect |
 |---|---|
@@ -90,13 +91,12 @@ Browsers connect to the runtime `WS_PUBLIC_URL` (served by `GET /api/ws-config`)
 { "action": "subscribe", "sessionId": "hall-a" }
 ```
 
-The service immediately sends the room `GameState`, then sends each subsequent state update only to sockets subscribed to that room. The same service also understands these internal/protocol messages:
+The service immediately sends the room `GameState`, then sends each subsequent state update only to sockets subscribed to that room. Public WebSocket connections are read-only: attempts to send game-changing actions directly are rejected. The Next.js service uses a private `INTERNAL_API_TOKEN` for trusted mutation messages; it is never sent to browsers. The same service also understands these read-only protocol messages:
 
 | Message | Response |
 |---|---|
 | `{ "action": "subscribe-lobby" }` | Initial `{ "sessions": RoomSummary[] }`, followed by refreshed room summaries after accepted room actions |
 | `{ "action": "list-sessions" }` | `{ "sessions": RoomSummary[] }` |
 | `{ "action": "ping", "sessionId": "hall-a" }` | Current `GameState` |
-| Any public game action above | Updated `GameState`, broadcast to subscribed room clients and an updated room list to lobby subscribers when accepted |
 
 Malformed WebSocket JSON is ignored. A draw-mode conflict returns `{ "error": "..." }` to the requesting socket and is not broadcast. Other unsupported or invalid direct WebSocket actions do not produce a structured error response; use the HTTP API for validated caller actions.

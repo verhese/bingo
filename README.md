@@ -33,15 +33,17 @@ When creating a room, you can also define a custom mode by selecting patterns an
 
 ```bash
 npm install
-cp .env.example .env              # set POSTGRES_PASSWORD
+cp .env.example .env              # set required secrets and POSTGRES_PASSWORD
 docker compose up -d postgres     # PostgreSQL on 127.0.0.1:5432
 export DATABASE_URL=postgres://bingo:<POSTGRES_PASSWORD>@localhost:5432/bingo
+# Set ADMIN_PASSWORD, ADMIN_SESSION_SECRET, and INTERNAL_API_TOKEN in this shell.
 npm run dev
-# In a second terminal (with DATABASE_URL set)
+# In a second terminal, set DATABASE_URL and the same INTERNAL_API_TOKEN
 npm run dev:ws
 ```
 
 The Next.js app runs at `http://localhost:3000`; the WebSocket game service runs at `ws://localhost:3001`. The game service refuses to start without `DATABASE_URL`; tables are created automatically on first start.
+Use an `ADMIN_PASSWORD` of at least 16 characters, and independently generated `ADMIN_SESSION_SECRET` and `INTERNAL_API_TOKEN` values of at least 32 bytes. The web service needs the password and session secret; the web and game services need the same internal token. Sign in at `/admin-login` before creating or controlling rooms.
 
 | URL | Purpose |
 |---|---|
@@ -72,7 +74,7 @@ Before the first end-to-end run, install the browser with `npx playwright instal
 
 ## Docker deployment
 
-[compose.yaml](compose.yaml) runs the web application, the WebSocket game service, and PostgreSQL as separate containers. Publish port `3000` for the web app and port `3001` for browser WebSocket connections. Set `POSTGRES_PASSWORD` (in `.env` or the environment) before starting; Compose will not start without it. Rooms are stored in the `postgres-data` volume, so they survive restarts and `docker compose up -d` upgrades; `docker compose down -v` deletes them. See [docs/PERSISTENCE.md](docs/PERSISTENCE.md) for configuration, backups, and production notes.
+[compose.yaml](compose.yaml) runs the web application, the WebSocket game service, and PostgreSQL as separate containers. Publish port `3000` for the web app and port `3001` for browser WebSocket connections. Set `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, and `INTERNAL_API_TOKEN` in `.env` or the environment before starting; Compose refuses to start without them. Never expose the internal token through browser configuration. Rooms are stored in the `postgres-data` volume, so they survive restarts and `docker compose up -d` upgrades; `docker compose down -v` deletes them. See [docs/PERSISTENCE.md](docs/PERSISTENCE.md) for configuration, backups, and production notes.
 
 `GAME_SERVER_WS_URL=ws://ws-server:3001` is configured inside Compose for the web container. Browsers must not use that internal hostname. By default clients use the page hostname on port `3001`. Set `WS_PUBLIC_URL` on the `web` service when a different public WebSocket URL is required (for example behind a reverse proxy, such as on a Synology NAS):
 
@@ -91,16 +93,22 @@ services:
   web:
     image: ghcr.io/<owner>/bingo:latest
     command: npm start
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?Set ADMIN_SESSION_SECRET}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?Set INTERNAL_API_TOKEN}
   ws-server:
     image: ghcr.io/<owner>/bingo:latest
     command: npm run start:ws
+    environment:
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?Set INTERNAL_API_TOKEN}
 ```
 
 Update with `docker compose pull && docker compose up -d`.
 
-## Architecture and limitations
+## Architecture and access control
 
-The WebSocket process is the game authority. The HTTP route at `/api/game` validates and forwards caller actions to it, while browser clients first load a snapshot and then subscribe directly for room-specific state updates. Rooms and game state are stored in PostgreSQL and restored when the service restarts; the service must run as a single instance. The admin panel is a caller-facing route but does not currently include authentication.
+The WebSocket process is the game authority. Admin pages require a signed, HttpOnly administrator session; `/api/game` mutations also validate the session and same-origin request. The game service accepts mutations only from the trusted web service using the private internal token. Public browser WebSocket connections remain read-only and can subscribe to room updates. Rooms and game state are stored in PostgreSQL and restored when the service restarts; the service must run as a single instance.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the system design, [shared/flow-webservice-api-reference.md](shared/flow-webservice-api-reference.md) for the HTTP and WebSocket contracts, and [shared/flow-ui-reference.md](shared/flow-ui-reference.md) for UI behavior.
 

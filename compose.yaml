@@ -8,6 +8,9 @@ services:
     environment:
       GAME_SERVER_WS_URL: ws://ws-server:3001
       WS_PUBLIC_URL: ${WS_PUBLIC_URL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD (minimum 16 characters)}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?Set ADMIN_SESSION_SECRET (minimum 32 bytes)}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?Set INTERNAL_API_TOKEN (minimum 32 bytes)}
     depends_on:
       - ws-server
     restart: unless-stopped
@@ -22,6 +25,7 @@ services:
       WS_PORT: "3001"
       DATABASE_URL: postgres://bingo@postgres:5432/bingo
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (see .env.example)}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?Set INTERNAL_API_TOKEN (minimum 32 bytes)}
     depends_on:
       postgres:
         condition: service_healthy

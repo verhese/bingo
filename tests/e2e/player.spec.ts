@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test.describe('player workflow', () => {
   test('player-card page generates cards and offers print and PDF export', async ({ page }) => {

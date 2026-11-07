@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { openLobbySubscriber, openSubscriber, request, requestRaw, startGameServer, waitFor, type TestServer } from './helpers';
+import { TEST_INTERNAL_API_TOKEN } from '../support/test-auth';
 
 type State = {
   sessionId: string;
@@ -20,7 +21,10 @@ type State = {
 type ErrorResult = { error: string };
 
 let server: TestServer;
-const send = <T = State>(message: Record<string, unknown>) => request<T>(server.url, message);
+const send = <T = State>(message: Record<string, unknown>) => request<T>(server.url, {
+  ...message,
+  internalApiToken: TEST_INTERNAL_API_TOKEN,
+});
 
 async function createRoom(roomName: string, gameModeId = 'standard', extra: Record<string, unknown> = {}) {
   const room = await send({ action: 'create-session', roomName, gameModeId, ...extra });
@@ -358,10 +362,21 @@ describe('game server (WebSocket)', () => {
   });
 
   it('ignores unknown actions', async () => {
-    const reply = await request(server.url, { action: 'not-a-real-action', sessionId: 'default' });
+    const reply = await request(server.url, {
+      action: 'not-a-real-action',
+      sessionId: 'default',
+      internalApiToken: TEST_INTERNAL_API_TOKEN,
+    });
     assert.equal(reply, null);
     const state = await send({ action: 'ping', sessionId: 'default' });
     assert.equal(state?.sessionId, 'default');
+  });
+
+  it('rejects direct unauthenticated WebSocket mutations', async () => {
+    const reply = await request<ErrorResult>(server.url, { action: 'reset', sessionId: 'default' });
+    assert.match(reply?.error ?? '', /authorization/i);
+    const state = await send({ action: 'ping', sessionId: 'default' });
+    assert.equal(state?.drawnNumbers.length, 0);
   });
 
   it('ignores malformed JSON messages', async () => {
