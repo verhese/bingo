@@ -64,7 +64,8 @@ Use the same `room` value in the game room and admin URLs to share a session, fo
 | `npm run start` | Start the production Next.js server. |
 | `npm run start:ws` | Start the WebSocket game service (needs `DATABASE_URL`). |
 | `npm run lint` | Run ESLint across the project. |
-| `npm test` | Run unit and integration tests. |
+
+| `npm test` | Run unit and integration tests. |
 | `npm run test:unit` | Run unit tests for pure game rules, storage serialization, and utilities (`src/**/*.test.ts`). |
 | `npm run test:integration` | Start a throwaway PostgreSQL and WebSocket game server on free ports and test its actions, persistence across restarts, storage failures, and the `/api/game` handlers (`tests/integration`). |
 | `npm run test:e2e` | Run Playwright browser tests against isolated servers and a throwaway PostgreSQL on ports 3100/3101/3102/54329 (`tests/e2e`). |
@@ -73,7 +74,7 @@ Use the same `room` value in the game room and admin URLs to share a session, fo
 Before the first end-to-end run, install the browser with `npx playwright install chromium`. The test suites start their own servers and database (no Docker or local PostgreSQL needed) and keep no state, so they can run while the development servers are running. CI runs them in `.github/workflows/tests.yml`.
 
 ## Docker deployment
-
+[compose.yaml](compose.yaml) runs the web application, the WebSocket game service, and PostgreSQL as separate containers. Publish port `3000` for the web app and port `3001` for browser WebSocket connections. For non-localhost access, serve the web app over HTTPS through a TLS-terminating reverse proxy: production administrator cookies are `Secure` and will not be stored over plain HTTP. Proxy browser WebSocket connections over TLS as well, and set `WS_PUBLIC_URL` to that public `wss://` endpoint as shown below. Set `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, and `INTERNAL_API_TOKEN` in `.env` or the environment before starting; Compose refuses to start without them. Never expose the internal token through browser configuration. Rooms are stored in the `postgres-data` volume, so they survive restarts and `docker compose up -d` upgrades; `docker compose down -v` deletes them. See [docs/PERSISTENCE.md](docs/PERSISTENCE.md) for configuration, backups, and production notes.
 [compose.yaml](compose.yaml) runs the web application, the WebSocket game service, and PostgreSQL as separate containers. Publish port `3000` for the web app and port `3001` for browser WebSocket connections. Set `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`, and `INTERNAL_API_TOKEN` in `.env` or the environment before starting; Compose refuses to start without them. Never expose the internal token through browser configuration. Rooms are stored in the `postgres-data` volume, so they survive restarts and `docker compose up -d` upgrades; `docker compose down -v` deletes them. See [docs/PERSISTENCE.md](docs/PERSISTENCE.md) for configuration, backups, and production notes.
 
 `GAME_SERVER_WS_URL=ws://ws-server:3001` is configured inside Compose for the web container. Browsers must not use that internal hostname. By default clients use the page hostname on port `3001`. Set `WS_PUBLIC_URL` on the `web` service when a different public WebSocket URL is required (for example behind a reverse proxy, such as on a Synology NAS):
