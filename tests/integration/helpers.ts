@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import WebSocket from 'ws';
 import { startTestDatabase, type TestDatabase } from '../support/postgres';
+import { TEST_INTERNAL_API_TOKEN } from '../support/test-auth';
 
 export interface TestServer {
   readonly port: number;
@@ -56,7 +57,13 @@ export async function startGameServer(options: StartGameServerOptions = {}): Pro
 export async function spawnGameServer(env: Record<string, string | undefined> = {}) {
   const port = await getFreePort();
   const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', 'src/server/ws-server.ts'], {
-    env: { ...process.env, DATABASE_PASSWORD: undefined, ...env, WS_PORT: String(port) },
+    env: {
+      ...process.env,
+      DATABASE_PASSWORD: undefined,
+      INTERNAL_API_TOKEN: TEST_INTERNAL_API_TOKEN,
+      ...env,
+      WS_PORT: String(port),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const logs: string[] = [];

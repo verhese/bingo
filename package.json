@@ -51,5 +51,8 @@
     "core-js@3.51.0": true,
     "esbuild@0.28.2": true,
     "@embedded-postgres/windows-x64@17.5.0-beta.15": true
+  },
+  "overrides": {
+    "postcss-selector-parser": "^6.1.5"
   }
 }

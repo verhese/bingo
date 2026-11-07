@@ -4,6 +4,12 @@ import { isGameVariant, VARIANTS } from '@/lib/variants';
 import { verifyBingoNumbers } from '@/lib/bingoClaim';
 import { BUILT_IN_GAME_MODES, createCustomGameMode } from '@/lib/gameModes';
 import { normalizeRoomId } from '@/lib/gameRoom';
+import {
+  ADMIN_SESSION_COOKIE,
+  isAdminAuthConfigured,
+  isSameOrigin,
+  isValidAdminSession,
+} from '@/server/admin-auth';
 import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 
 const WS_URL = process.env.GAME_SERVER_WS_URL || 'ws://localhost:3001';
@@ -44,12 +50,16 @@ function requestGameState(
     gameModeId?: string;
     gameModeName?: unknown;
     patterns?: unknown;
+    internalApiToken?: string;
   },
 ): Promise<GameState> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(WS_URL);
 
-    socket.once('open', () => socket.send(JSON.stringify(message)));
+    socket.once('open', () => socket.send(JSON.stringify({
+      ...message,
+      internalApiToken: process.env.INTERNAL_API_TOKEN,
+    })));
     socket.on('message', (data) => {
       try {
         const gameState = parseGameResponse(data);
@@ -90,6 +100,16 @@ function requestSessions(): Promise<RoomSummary[]> {
 
 // POST /api/game — Handles draw and reset actions
 export async function POST(req: NextRequest) {
+  if (!isSameOrigin(req.headers.get('origin'), req.nextUrl.origin)) {
+    return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
+  }
+  if (
+    !isAdminAuthConfigured()
+    || !isValidAdminSession(req.cookies.get(ADMIN_SESSION_COOKIE)?.value)
+  ) {
+    return NextResponse.json({ error: 'Administrator sign in is required.' }, { status: 401 });
+  }
+
   let body: {
     action: 'create-session' | 'draw' | 'call-number' | 'undo-last-draw' | 'reset' | 'change-variant' | 'verify-bingo' | 'select-game-mode' | 'create-game-mode';
     sessionId?: string;

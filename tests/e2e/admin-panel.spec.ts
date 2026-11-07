@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 async function createRoom(page: Page, name: string, variant = '75-ball') {
   await page.goto('/admin-panel/create');
@@ -13,6 +13,32 @@ async function createRoom(page: Page, name: string, variant = '75-ball') {
 }
 
 test.describe('admin create and game-control pages', () => {
+  test('redirects unsigned users and refuses unauthenticated room mutations', async ({ browser, baseURL }) => {
+    if (!baseURL) throw new Error('Playwright baseURL is required.');
+    const context = await browser.newContext({ baseURL });
+    try {
+      const page = await context.newPage();
+      await page.goto('/admin-panel/create');
+      await expect(page).toHaveURL(/\/admin-login$/);
+
+      const response = await page.request.post(new URL('/api/game', baseURL).toString(), {
+        data: { action: 'reset', sessionId: 'default' },
+        headers: { Origin: new URL(baseURL).origin },
+      });
+      expect(response.status()).toBe(401);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('signing out revokes access to admin pages', async ({ page }) => {
+    await page.goto('/admin-panel/create');
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page).toHaveURL(/\/lobby$/);
+    await page.goto('/admin-panel/create');
+    await expect(page).toHaveURL(/\/admin-login$/);
+  });
+
   test('redirects to the lobby when no room is given and never draws on the default room', async ({ page }) => {
     const before = await (await page.request.get('/api/game?sessionId=default')).json();
     await page.goto('/admin-panel');

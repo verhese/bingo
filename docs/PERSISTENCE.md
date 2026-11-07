@@ -18,6 +18,9 @@ Rooms are isolated by room ID. A reset replaces only that room's row and keeps i
 | `DATABASE_PASSWORD` | game service | Optional raw password passed separately from `DATABASE_URL`, for credentials that need URI encoding. |
 | `POSTGRES_PASSWORD` | Docker Compose | Password for the bundled `postgres` service. **Required** by Compose; Compose passes it to the game service separately as `DATABASE_PASSWORD`. |
 | `DATABASE_CONNECT_ATTEMPTS` | game service | Optional. Startup connection attempts, one per second (default `30`), so the service can outlast a database that is still starting. |
+| `ADMIN_PASSWORD` | web service | Required for administrator sign-in; at least 16 characters. |
+| `ADMIN_SESSION_SECRET` | web service | Required signing key for eight-hour administrator sessions; at least 32 bytes. |
+| `INTERNAL_API_TOKEN` | web and game services | Required private credential for web-to-game-service mutations; at least 32 bytes. Use the same value in both services, keep it out of browser configuration, and rotate it in both services together. |
 
 Do not commit credentials. `.env*` files are git-ignored; `.env.example` lists the variable names only. Connection strings and passwords are never written to logs or returned to clients. `DATABASE_PASSWORD` is optional when the URL contains a password; set it separately when a password contains characters that need URI encoding.
 
@@ -39,12 +42,13 @@ Rooms created before this change lived in memory only and cannot be recovered.
 cp .env.example .env            # then set POSTGRES_PASSWORD
 docker compose up -d postgres   # PostgreSQL on 127.0.0.1:5432
 export DATABASE_URL=postgres://bingo:<POSTGRES_PASSWORD>@localhost:5432/bingo
+# Export ADMIN_PASSWORD, ADMIN_SESSION_SECRET, and INTERNAL_API_TOKEN for local processes.
 npm run dev:ws
 ```
 
-(PowerShell: `$env:DATABASE_URL = "postgres://bingo:<POSTGRES_PASSWORD>@localhost:5432/bingo"`.)
+(PowerShell: set the variables with `$env:NAME = "value"` before starting each process.)
 
-Compose reads `POSTGRES_PASSWORD` from `.env`; the dev scripts do not read `.env`, so export `DATABASE_URL` in your shell.
+Compose reads its required secrets from `.env`; the dev scripts do not read `.env`, so export `DATABASE_URL` and `INTERNAL_API_TOKEN` in the game-service shell. The web development process also needs `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET`.
 
 Tests need no database setup: integration and end-to-end suites start a throwaway PostgreSQL (`embedded-postgres`) on a free port with its own temporary data directory, and remove it afterwards.
 

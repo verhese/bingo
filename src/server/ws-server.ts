@@ -6,6 +6,7 @@ import { verifyBingoNumbers } from '@/lib/bingoClaim';
 import { BUILT_IN_GAME_MODES, DEFAULT_GAME_MODE_ID, advanceGameModeStage, createCustomGameMode } from '@/lib/gameModes';
 import { DEFAULT_ROOM_ID, normalizeRoomId, normalizeRoomName } from '@/lib/gameRoom';
 import { createNewGame, getStages, syncStageState } from '@/lib/gameState';
+import { isValidInternalApiToken } from './admin-auth';
 import { createRoomStore } from './storage';
 import { fromPersistedRoom, toPersistedRoom } from './storage/serialization';
 import { StorageError, describeError, type RoomStore } from './storage/types';
@@ -308,6 +309,7 @@ wss.on('connection', (ws: WebSocket) => {
       gameModeId?: string;
       gameModeName?: unknown;
       patterns?: unknown;
+      internalApiToken?: string;
     };
     try {
       parsed = JSON.parse(data.toString());
@@ -344,6 +346,11 @@ wss.on('connection', (ws: WebSocket) => {
         return;
       }
       ws.send(JSON.stringify(session));
+      return;
+    }
+
+    if (!isValidInternalApiToken(parsed.internalApiToken)) {
+      ws.send(JSON.stringify({ error: 'Administrator authorization is required.' }));
       return;
     }
 

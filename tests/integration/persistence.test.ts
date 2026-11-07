@@ -3,6 +3,7 @@ import { after, before, describe, it } from 'node:test';
 import { Client } from 'pg';
 import { startTestDatabase, type TestDatabase } from '../support/postgres';
 import { openLobbySubscriber, openSubscriber, request, spawnGameServer, startGameServer, type TestServer } from './helpers';
+import { TEST_INTERNAL_API_TOKEN } from '../support/test-auth';
 
 type State = {
   sessionId: string;
@@ -39,7 +40,10 @@ async function restartServer() {
   return startServer();
 }
 
-const send = <T = State>(message: Record<string, unknown>, timeoutMs = 3_000) => request<T>(server!.url, message, timeoutMs);
+const send = <T = State>(message: Record<string, unknown>, timeoutMs = 3_000) => request<T>(server!.url, {
+  ...message,
+  internalApiToken: TEST_INTERNAL_API_TOKEN,
+}, timeoutMs);
 
 async function createRoom(roomName: string, extra: Record<string, unknown> = {}) {
   const room = await send({ action: 'create-session', roomName, ...extra });
