@@ -10,6 +10,7 @@ export function createRoomStore(env: Record<string, string | undefined> = proces
   const attempts = Number(env.DATABASE_CONNECT_ATTEMPTS);
   return new PostgresRoomStore({
     connectionString,
+    password: env.DATABASE_PASSWORD,
     connectAttempts: Number.isInteger(attempts) && attempts > 0 ? attempts : undefined,
   });
 }

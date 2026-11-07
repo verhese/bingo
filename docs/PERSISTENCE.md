@@ -15,10 +15,11 @@ Rooms are isolated by room ID. A reset replaces only that room's row and keeps i
 | Variable | Used by | Purpose |
 |---|---|---|
 | `DATABASE_URL` | game service | PostgreSQL connection string, e.g. `postgres://bingo:<password>@localhost:5432/bingo`. **Required**: the service refuses to start without it, so rooms are never silently kept in memory only. |
-| `POSTGRES_PASSWORD` | Docker Compose | Password for the bundled `postgres` service. **Required** by Compose; Compose builds the game service's `DATABASE_URL` from it. |
+| `DATABASE_PASSWORD` | game service | Optional raw password passed separately from `DATABASE_URL`, for credentials that need URI encoding. |
+| `POSTGRES_PASSWORD` | Docker Compose | Password for the bundled `postgres` service. **Required** by Compose; Compose passes it to the game service separately as `DATABASE_PASSWORD`. |
 | `DATABASE_CONNECT_ATTEMPTS` | game service | Optional. Startup connection attempts, one per second (default `30`), so the service can outlast a database that is still starting. |
 
-Do not commit credentials. `.env*` files are git-ignored; `.env.example` lists the variable names only. Connection strings and passwords are never written to logs or returned to clients.
+Do not commit credentials. `.env*` files are git-ignored; `.env.example` lists the variable names only. Connection strings and passwords are never written to logs or returned to clients. `DATABASE_PASSWORD` is optional when the URL contains a password; set it separately when a password contains characters that need URI encoding.
 
 PostgreSQL 17 is used by the bundled Compose service and the test suites; the schema uses only basic, long-standing PostgreSQL features.
 
@@ -63,8 +64,10 @@ If PostgreSQL cannot store a change, the game service leaves the room unchanged,
 Back up the database, not the container:
 
 ```bash
-docker compose exec postgres pg_dump -U bingo -Fc bingo > bingo.dump
-docker compose exec -T postgres pg_restore -U bingo -d bingo --clean --if-exists < bingo.dump
+docker compose exec -T postgres pg_dump -U bingo -Fc bingo > bingo.dump
+docker compose stop ws-server &&
+  docker compose exec -T postgres pg_restore -U bingo -d bingo --clean --if-exists < bingo.dump &&
+  docker compose start ws-server
 ```
 
-Restart `ws-server` after a restore so it reloads the rooms. `docker compose down -v` deletes the `postgres-data` volume and with it every room.
+Keep `ws-server` stopped throughout the restore and start it only after the restore succeeds, so stale in-memory state cannot overwrite the restored rooms. `docker compose down -v` deletes the `postgres-data` volume and with it every room.

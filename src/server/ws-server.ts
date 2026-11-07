@@ -62,7 +62,8 @@ function createSession(
   let sessionId = baseId === DEFAULT_ROOM_ID ? `room-${Date.now()}` : baseId;
   let suffix = 2;
   while (gameSessions.has(sessionId)) {
-    sessionId = `${baseId}-${suffix}`;
+    const suffixText = String(suffix);
+    sessionId = `${baseId.slice(0, 31 - suffixText.length)}-${suffixText}`;
     suffix += 1;
   }
   return createNewGame(variant, sessionId, normalizedRoomName, selectedGameModeId, customGameModes);
@@ -190,6 +191,9 @@ function handleGameAction(
   }
 
   if (parsed.action === 'call-number' && typeof parsed.number === 'number') {
+    if (session.drawnNumbers.includes(parsed.number)) {
+      return { error: 'That number has already been called.' };
+    }
     if (session.status === 'waiting') session.status = 'in-play';
     session.drawMode ??= 'manual';
     session.drawnNumbers.push(parsed.number);

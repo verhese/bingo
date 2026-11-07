@@ -14,7 +14,7 @@ export interface TestDatabase {
 }
 
 const USER = 'bingo';
-const PASSWORD = 'bingo-test';
+const PASSWORD = 'bingo/?:#test';
 
 async function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -48,7 +48,7 @@ export async function startTestDatabase(options: { port?: number } = {}): Promis
 
   let running = true;
   return {
-    url: `postgres://${USER}:${PASSWORD}@localhost:${port}/bingo`,
+    url: `postgres://${USER}:${encodeURIComponent(PASSWORD)}@localhost:${port}/bingo`,
     async pause() {
       if (!running) return;
       running = false;

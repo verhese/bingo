@@ -96,6 +96,7 @@ const PLACEHOLDERS = '$1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, 
 
 export interface PostgresRoomStoreOptions {
   connectionString: string;
+  password?: string;
   /** Attempts made by init() before giving up, one second apart. Lets the service outlast a database that is still starting. */
   connectAttempts?: number;
 }
@@ -104,10 +105,16 @@ export class PostgresRoomStore implements RoomStore {
   private readonly pool: Pool;
   private readonly connectAttempts: number;
 
-  constructor({ connectionString, connectAttempts = 30 }: PostgresRoomStoreOptions) {
+  constructor({ connectionString, password, connectAttempts = 30 }: PostgresRoomStoreOptions) {
     this.connectAttempts = connectAttempts;
+    let poolConnectionString = connectionString;
+    if (password !== undefined) {
+      const url = new URL(connectionString);
+      url.password = password;
+      poolConnectionString = url.href;
+    }
     this.pool = new Pool({
-      connectionString,
+      connectionString: poolConnectionString,
       max: 5,
       connectionTimeoutMillis: 3_000,
       query_timeout: 5_000,

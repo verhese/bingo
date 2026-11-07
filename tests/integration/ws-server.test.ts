@@ -162,6 +162,14 @@ describe('game server (WebSocket)', () => {
       assert.deepEqual(state?.undoneNumbers, [12]);
     });
 
+    it('rejects a number that has already been called', async () => {
+      const room = await createRoom('Duplicate call');
+      await callNumbers(room.sessionId, [42]);
+      const duplicate = await send<ErrorResult>({ action: 'call-number', sessionId: room.sessionId, number: 42 });
+      assert.match(duplicate?.error ?? '', /already been called/i);
+      assert.deepEqual((await send({ action: 'ping', sessionId: room.sessionId }))?.drawnNumbers, [42]);
+    });
+
     it('finishes the game when every number has been drawn', async () => {
       const room = await createRoom('Exhaust', 'single-row', { variant: 'speedy' });
       for (let i = 0; i < 31; i += 1) await send({ action: 'draw', sessionId: room.sessionId });

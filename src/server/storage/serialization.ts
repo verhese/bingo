@@ -1,7 +1,7 @@
 import type { BingoPattern } from '@/lib/bingoPatterns';
 import type { GameMode } from '@/lib/gameModes';
 import { isBingoPattern } from '@/lib/gameModes';
-import { createNewGame, syncStageState } from '@/lib/gameState';
+import { createNewGame, getStages, syncStageState } from '@/lib/gameState';
 import { isGameVariant } from '@/lib/variants';
 import type { GameState } from '@/types/game';
 import { StorageError, type PersistedRoom } from './types';
@@ -49,6 +49,7 @@ export function fromPersistedRoom(room: PersistedRoom): GameState {
   if (room.verifiedBingo !== null && !isIntegerArray(room.verifiedBingo.claimedNumbers)) corrupt(id, 'invalid verified claim');
 
   const state = createNewGame(room.variant, room.sessionId, room.roomName, room.gameModeId, room.customGameModes);
+  if (room.stageIndex >= getStages(state).length) corrupt(id, 'invalid stage index');
   state.completedStages = [...room.completedStages] as BingoPattern[];
   state.drawMode = room.drawMode;
   state.drawnNumbers = [...room.drawnNumbers];

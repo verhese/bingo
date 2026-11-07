@@ -55,6 +55,7 @@ describe('room serialization', () => {
       { drawnNumbers: [1, 1] },
       { drawnNumbers: [1.5] },
       { stageIndex: -1 },
+      { stageIndex: 999 },
       { completedStages: ['nope' as PersistedRoom['completedStages'][number]] },
       { customGameModes: [{ id: 1 }] as unknown as PersistedRoom['customGameModes'] },
       { verifiedBingo: { claimedNumbers: ['x'] } as unknown as PersistedRoom['verifiedBingo'] },

@@ -85,6 +85,19 @@ describe('persistence across restarts', () => {
     assert.equal((await query('SELECT count(*)::int AS count FROM rooms'))[0].count, 1);
   });
 
+  it('connects when the raw password is supplied separately from the URL', async () => {
+    await restartServer();
+    await server!.stop();
+    const connectionUrl = new URL(database.url);
+    const password = decodeURIComponent(connectionUrl.password);
+    connectionUrl.password = '';
+    server = await startGameServer({
+      databaseUrl: connectionUrl.toString(),
+      env: { DATABASE_PASSWORD: password },
+    });
+    assert.equal((await send({ action: 'ping', sessionId: 'default' }))?.sessionId, 'default');
+  });
+
   it('persists calls and undo, and restores them exactly after a restart', async () => {
     await restartServer();
     const room = await createRoom('Restore me');
@@ -207,6 +220,18 @@ describe('persistence across restarts', () => {
     assert.deepEqual((await send({ action: 'ping', sessionId: first.sessionId }))?.drawnNumbers, [10]);
   });
 
+  it('keeps colliding long room IDs within the database limit', async () => {
+    const roomName = 'a'.repeat(32);
+    const first = await createRoom(roomName);
+    const second = await createRoom(roomName);
+    assert.equal(first.sessionId, roomName);
+    assert.equal(second.sessionId.length, 32);
+    assert.notEqual(second.sessionId, first.sessionId);
+
+    await restartServer();
+    assert.equal((await send({ action: 'ping', sessionId: second.sessionId }))?.sessionId, second.sessionId);
+  });
+
   it('does not recreate the default room over a stored one', async () => {
     await send({ action: 'reset', sessionId: 'default' });
     await callNumbers('default', [60, 61]);
@@ -223,6 +248,19 @@ describe('persistence across restarts', () => {
 
     await restartServer();
     assert.deepEqual((await send({ action: 'ping', sessionId: room.sessionId }))?.drawnNumbers, live?.drawnNumbers);
+  });
+
+  it('rejects concurrent duplicate calls without persisting corrupt room state', async () => {
+    const room = await createRoom('Concurrent duplicate');
+    const results = await Promise.all([
+      send<State | ErrorResult>({ action: 'call-number', sessionId: room.sessionId, number: 42 }),
+      send<State | ErrorResult>({ action: 'call-number', sessionId: room.sessionId, number: 42 }),
+    ]);
+    assert.equal(results.filter((result) => result && 'error' in result).length, 1);
+    assert.deepEqual((await send({ action: 'ping', sessionId: room.sessionId }))?.drawnNumbers, [42]);
+
+    await restartServer();
+    assert.deepEqual((await send({ action: 'ping', sessionId: room.sessionId }))?.drawnNumbers, [42]);
   });
 });
 
