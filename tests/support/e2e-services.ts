@@ -24,9 +24,12 @@ function startGameServer(): Promise<void> {
       stdio: ['ignore', 'pipe', 'inherit'],
     });
     gameServer = child;
+    let startupOutput = '';
     child.stdout?.on('data', (chunk: Buffer) => {
-      process.stdout.write(chunk);
-      if (chunk.toString().includes('running on')) resolve();
+      const output = chunk.toString();
+      startupOutput += output;
+      process.stdout.write(output);
+      if (startupOutput.includes('"event":"service_started"')) resolve();
     });
     child.once('exit', (code) => reject(new Error(`Game server exited (${code})`)));
   });

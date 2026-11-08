@@ -46,6 +46,18 @@ describe('game server (WebSocket)', () => {
     await server.stop();
   });
 
+  it('reports liveness and database-backed readiness over HTTP', async () => {
+    const httpUrl = server.url.replace(/^ws:/, 'http:');
+    const liveResponse = await fetch(`${httpUrl}/health/live`);
+    assert.equal(liveResponse.status, 200);
+    assert.equal(liveResponse.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await liveResponse.json(), { status: 'ok' });
+
+    const readyResponse = await fetch(`${httpUrl}/health/ready`);
+    assert.equal(readyResponse.status, 200);
+    assert.deepEqual(await readyResponse.json(), { status: 'ok' });
+  });
+
   describe('rooms', () => {
     it('creates rooms with unique ids and lists them', async () => {
       const first = await createRoom('Alpha Room');

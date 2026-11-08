@@ -45,6 +45,8 @@ export function describeError(error: unknown): string {
 export interface RoomStore {
   /** Prepares storage (connects, applies migrations). Must complete before any other call. */
   init(): Promise<void>;
+  /** Verifies that the backing store can serve requests. */
+  checkHealth(): Promise<void>;
   loadRooms(): Promise<PersistedRoom[]>;
   /** Inserts a new room. Resolves false, leaving storage unchanged, if the ID already exists. */
   createRoom(room: PersistedRoom): Promise<boolean>;

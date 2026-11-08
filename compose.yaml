@@ -12,7 +12,18 @@ services:
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?Set ADMIN_SESSION_SECRET (minimum 32 bytes)}
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?Set INTERNAL_API_TOKEN (minimum 32 bytes)}
     depends_on:
-      - ws-server
+      ws-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health/ready').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
 
   ws-server:
@@ -29,6 +40,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/health/ready').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
 
   postgres:

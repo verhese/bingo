@@ -10,6 +10,7 @@ import {
   isSameOrigin,
   isValidAdminSession,
 } from '@/server/admin-auth';
+import { logEvent } from '@/server/logger';
 import type { GameState, GameVariant, RoomSummary } from '@/types/game';
 
 const WS_URL = process.env.GAME_SERVER_WS_URL || 'ws://localhost:3001';
@@ -227,11 +228,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ gameState });
   } catch (error) {
     if (error instanceof GameStorageError) {
+      logEvent('web', 'error', 'game_service_storage_failure', { action });
       return NextResponse.json({ error: error.message, code: 'storage-error' }, { status: 503 });
     }
     if (error instanceof GameActionRejectedError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
+    logEvent('web', 'error', 'game_service_request_failed', {
+      action,
+      error_name: error instanceof Error ? error.name : 'UnknownError',
+    });
     return NextResponse.json({ error: 'Game service is unavailable' }, { status: 503 });
   }
 }
@@ -243,6 +249,7 @@ export async function GET(req: NextRequest) {
       const sessions = await requestSessions();
       return NextResponse.json({ sessions });
     } catch {
+      logEvent('web', 'error', 'game_service_request_failed', { action: 'list-sessions' });
       return NextResponse.json({ error: 'Game service is unavailable' }, { status: 503 });
     }
   }
@@ -255,6 +262,10 @@ export async function GET(req: NextRequest) {
     if (error instanceof GameActionRejectedError && error.message.toLowerCase().includes('not found')) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }
+    logEvent('web', 'error', 'game_service_request_failed', {
+      action: 'ping',
+      error_name: error instanceof Error ? error.name : 'UnknownError',
+    });
     return NextResponse.json({ error: 'Game service is unavailable' }, { status: 503 });
   }
 }
