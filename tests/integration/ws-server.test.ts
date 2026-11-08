@@ -56,6 +56,24 @@ describe('game server (WebSocket)', () => {
     const readyResponse = await fetch(`${httpUrl}/health/ready`);
     assert.equal(readyResponse.status, 200);
     assert.deepEqual(await readyResponse.json(), { status: 'ok' });
+
+    await server.database!.pause();
+    try {
+      const unavailableResponse = await fetch(`${httpUrl}/health/ready`);
+      assert.equal(unavailableResponse.status, 503);
+      assert.equal(unavailableResponse.headers.get('cache-control'), 'no-store');
+      assert.deepEqual(await unavailableResponse.json(), { status: 'unavailable' });
+
+      const outageLiveResponse = await fetch(`${httpUrl}/health/live`);
+      assert.equal(outageLiveResponse.status, 200);
+      assert.deepEqual(await outageLiveResponse.json(), { status: 'ok' });
+    } finally {
+      await server.database!.resume();
+    }
+
+    const recoveredResponse = await fetch(`${httpUrl}/health/ready`);
+    assert.equal(recoveredResponse.status, 200);
+    assert.deepEqual(await recoveredResponse.json(), { status: 'ok' });
   });
 
   describe('rooms', () => {
