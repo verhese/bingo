@@ -25,11 +25,17 @@ function startGameServer(): Promise<void> {
     });
     gameServer = child;
     let startupOutput = '';
+    let startupComplete = false;
     child.stdout?.on('data', (chunk: Buffer) => {
       const output = chunk.toString();
-      startupOutput += output;
       process.stdout.write(output);
-      if (startupOutput.includes('"event":"service_started"')) resolve();
+      if (startupComplete) return;
+      startupOutput += output;
+      if (startupOutput.includes('"event":"service_started"')) {
+        startupOutput = '';
+        startupComplete = true;
+        resolve();
+      }
     });
     child.once('exit', (code) => reject(new Error(`Game server exited (${code})`)));
   });
