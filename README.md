@@ -89,6 +89,8 @@ This is a runtime variable served through `/api/ws-config`, so changing it only 
 
 CI publishes one generic image to GHCR (`ghcr.io/<owner>/bingo`, tags `latest` and the commit SHA) and, when the `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` secrets exist, to Docker Hub. Use it for both services instead of building locally:
 
+The image contains the Next.js standalone server and a bundled game service; development and test dependencies are not shipped. The same image supports both `npm start` and `npm run start:ws`.
+
 ```yaml
 services:
   web:
