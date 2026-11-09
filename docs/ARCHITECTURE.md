@@ -54,4 +54,6 @@ The service keeps sessions in a process-local `Map` backed by PostgreSQL persist
 
 Docker Compose runs `web` and `ws-server` as separate containers. The web container reaches the service through `GAME_SERVER_WS_URL=ws://ws-server:3001`. Browsers connect either through the runtime `WS_PUBLIC_URL` (served by `/api/ws-config`) or the current page hostname on port `3001`, using `wss` when the page uses HTTPS.
 
+The web app exposes `/api/health/live` and `/api/health/ready`; readiness checks the game service. The game service exposes `/health/live` and `/health/ready`; readiness checks PostgreSQL. Compose waits for the WebSocket service to become healthy before starting the web app. See [OPERATIONS.md](OPERATIONS.md) for deployment and recovery procedures.
+
 For exact request, response, and WebSocket message contracts, see [../shared/flow-webservice-api-reference.md](../shared/flow-webservice-api-reference.md).

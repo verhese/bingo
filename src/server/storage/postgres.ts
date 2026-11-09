@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from 'pg';
+import { logEvent } from '../logger';
 import { StorageError, type PersistedRoom, type RoomStore } from './types';
 
 interface Migration {
@@ -121,7 +122,12 @@ export class PostgresRoomStore implements RoomStore {
       statement_timeout: 5_000,
     });
     // Idle clients can error when the database restarts; the next query reconnects.
-    this.pool.on('error', (error) => console.error('Database connection error:', error.message));
+    this.pool.on('error', (error) => {
+      logEvent('ws-server', 'error', 'database_connection_error', {
+        component: 'postgres',
+        error_name: error.name,
+      });
+    });
   }
 
   async init(): Promise<void> {
@@ -134,7 +140,11 @@ export class PostgresRoomStore implements RoomStore {
         if (error instanceof StorageError && error.code === 'schema-mismatch') throw error;
         lastError = error;
         if (attempt < this.connectAttempts) {
-          console.warn(`Database not ready (attempt ${attempt}/${this.connectAttempts}); retrying...`);
+          logEvent('ws-server', 'warn', 'database_connect_retry', {
+            component: 'postgres',
+            attempt,
+            max_attempts: this.connectAttempts,
+          });
           await new Promise((resolve) => setTimeout(resolve, 1_000));
         }
       }
@@ -176,7 +186,11 @@ export class PostgresRoomStore implements RoomStore {
   }
 
   private async applyMigration(client: PoolClient, migration: Migration): Promise<void> {
-    console.log(`Applying database migration ${migration.version} (${migration.name})`);
+    logEvent('ws-server', 'info', 'database_migration_started', {
+      component: 'postgres',
+      version: migration.version,
+      migration: migration.name,
+    });
     await client.query(migration.sql);
     await client.query('INSERT INTO schema_migrations (version, name) VALUES ($1, $2)', [migration.version, migration.name]);
   }
@@ -187,6 +201,14 @@ export class PostgresRoomStore implements RoomStore {
       return rows.map(fromRow);
     } catch (error) {
       throw new StorageError('unavailable', 'Rooms could not be loaded from the database.', { cause: error });
+    }
+  }
+
+  async checkHealth(): Promise<void> {
+    try {
+      await this.pool.query('SELECT 1');
+    } catch (error) {
+      throw new StorageError('unavailable', 'The database health check failed.', { cause: error });
     }
   }
 

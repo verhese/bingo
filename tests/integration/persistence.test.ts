@@ -27,6 +27,14 @@ type RoomList = { sessions: { sessionId: string; drawnCount: number }[] };
 const OUTAGE_TIMEOUT_MS = 10_000;
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
+function findStructuredEvent(error: Error, eventName: string): Record<string, unknown> | undefined {
+  const line = error.message
+    .split(/\r?\n/)
+    .find((entry) => entry.includes(`"event":"${eventName}"`));
+  if (!line) return undefined;
+  return JSON.parse(line.slice(line.indexOf('{'))) as Record<string, unknown>;
+}
+
 let database: TestDatabase;
 let server: TestServer | undefined;
 
@@ -327,7 +335,22 @@ describe('storage failures', () => {
 
   it('does not write credentials or connection details to the server log', async () => {
     const logs = server!.logs();
-    assert.match(logs, /Storage failure/);
+    const storageFailureLine = logs.split(/\r?\n/).find((line) => line.includes('"event":"storage_failure"'));
+    assert.ok(storageFailureLine, 'storage failures are written as structured events');
+    const storageFailure = JSON.parse(storageFailureLine) as {
+      timestamp: string;
+      level: string;
+      service: string;
+      event: string;
+      action: string;
+      code: string;
+    };
+    assert.ok(Number.isFinite(Date.parse(storageFailure.timestamp)));
+    assert.equal(storageFailure.level, 'error');
+    assert.equal(storageFailure.service, 'ws-server');
+    assert.equal(storageFailure.event, 'storage_failure');
+    assert.equal(storageFailure.action, 'call-number');
+    assert.equal(storageFailure.code, 'write-failed');
     assert.doesNotMatch(logs, /bingo-test/);
     assert.doesNotMatch(logs, /postgres:\/\//);
   });
@@ -363,7 +386,12 @@ describe('startup', () => {
     try {
       await assert.rejects(
         spawnGameServer({ DATABASE_URL: database.url, DATABASE_CONNECT_ATTEMPTS: '2' }),
-        (error: Error) => /could not start/.test(error.message) && !/bingo-test/.test(error.message),
+        (error: Error) => {
+          const startupFailure = findStructuredEvent(error, 'service_start_failed');
+          return typeof startupFailure?.error === 'string'
+            && startupFailure.error.includes('The database could not be reached')
+            && !error.message.includes('bingo-test');
+        },
       );
     } finally {
       await database.resume();
@@ -397,7 +425,14 @@ describe('startup', () => {
       `INSERT INTO rooms (session_id, room_name, variant, game_mode_id, custom_game_modes, status)
        VALUES ('damaged', 'Damaged', '75-ball', 'custom-x', '[{"id": 1}]'::jsonb, 'waiting')`,
     );
-    await assert.rejects(spawnGameServer({ DATABASE_URL: database.url }), /Stored room "damaged" is invalid/);
+    await assert.rejects(
+      spawnGameServer({ DATABASE_URL: database.url }),
+      (error: Error) => {
+        const startupFailure = findStructuredEvent(error, 'service_start_failed');
+        return typeof startupFailure?.error === 'string'
+          && startupFailure.error.includes('Stored room "damaged" is invalid');
+      },
+    );
     await query("DELETE FROM rooms WHERE session_id = 'damaged'");
     const started = await spawnGameServer({ DATABASE_URL: database.url });
     await started.stop();

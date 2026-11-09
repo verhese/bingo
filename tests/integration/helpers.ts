@@ -72,7 +72,6 @@ export async function spawnGameServer(env: Record<string, string | undefined> = 
 
   await new Promise<void>((resolve, reject) => {
     let settled = false;
-    let timer: ReturnType<typeof setTimeout>;
     function cleanup() {
       clearTimeout(timer);
       child.removeListener('exit', onExit);
@@ -88,8 +87,8 @@ export async function spawnGameServer(env: Record<string, string | undefined> = 
     }
     const onExit = (code: number | null) => fail(new Error(`Game server exited early (${code}): ${logs.join('').trim()}`));
     const onError = (error: Error) => fail(error);
-    const onData = (chunk: Buffer) => {
-      if (chunk.toString().includes('running on')) {
+    const onData = () => {
+      if (logs.join('').includes('"event":"service_started"')) {
         if (settled) return;
         settled = true;
         cleanup();
@@ -97,7 +96,7 @@ export async function spawnGameServer(env: Record<string, string | undefined> = 
       }
     };
 
-    timer = setTimeout(() => fail(new Error(`Game server did not start in time: ${logs.join('').trim()}`)), 30_000);
+    const timer = setTimeout(() => fail(new Error(`Game server did not start in time: ${logs.join('').trim()}`)), 30_000);
     child.once('exit', onExit);
     child.once('error', onError);
     child.stdout?.on('data', onData);

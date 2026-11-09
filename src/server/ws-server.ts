@@ -1,4 +1,4 @@
-import { createServer } from 'node:http';
+import { createServer, type ServerResponse } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { isGameVariant, VARIANTS } from '@/lib/variants';
 import { generateAllNumbers, getNextNumber } from '@/lib/bingoNumbers';
@@ -7,6 +7,7 @@ import { BUILT_IN_GAME_MODES, DEFAULT_GAME_MODE_ID, advanceGameModeStage, create
 import { DEFAULT_ROOM_ID, normalizeRoomId, normalizeRoomName } from '@/lib/gameRoom';
 import { createNewGame, getStages, syncStageState } from '@/lib/gameState';
 import { isValidInternalApiToken } from './admin-auth';
+import { logEvent } from './logger';
 import { createRoomStore } from './storage';
 import { fromPersistedRoom, toPersistedRoom } from './storage/serialization';
 import { StorageError, describeError, type RoomStore } from './storage/types';
@@ -87,6 +88,40 @@ const httpServer = createServer();
 const wss = new WebSocketServer({ noServer: true });
 const clientSessionIds = new WeakMap<WebSocket, string>();
 const lobbySubscribers = new Set<WebSocket>();
+
+function sendHealthResponse(response: ServerResponse, status: number, body: string) {
+  response.writeHead(status, {
+    'Cache-Control': 'no-store',
+    'Content-Type': 'application/json; charset=utf-8',
+  });
+  response.end(body);
+}
+
+httpServer.on('request', (request, response) => {
+  const path = request.url?.split('?')[0];
+  if (request.method !== 'GET' || (path !== '/health/live' && path !== '/health/ready')) {
+    response.writeHead(404);
+    response.end();
+    return;
+  }
+
+  if (path === '/health/live') {
+    sendHealthResponse(response, 200, '{"status":"ok"}');
+    return;
+  }
+
+  void store.checkHealth().then(
+    () => sendHealthResponse(response, 200, '{"status":"ok"}'),
+    (error: unknown) => {
+      logEvent('ws-server', 'error', 'readiness_check_failed', {
+        component: 'postgres',
+        error_name: error instanceof Error ? error.name : 'UnknownError',
+      });
+      sendHealthResponse(response, 503, '{"status":"unavailable"}');
+    },
+  );
+});
+
 function broadcastSessionState(gameState: GameState, sender: WebSocket) {
   const message = JSON.stringify(gameState);
   wss.clients.forEach((client) => {
@@ -291,11 +326,15 @@ function applyGameAction(parsed: Parameters<typeof handleGameAction>[0]): Promis
 
 function reportStorageFailure(action: string, error: unknown) {
   const code = error instanceof StorageError ? error.code : 'unknown';
-  console.error(`Storage failure during "${action}" [${code}]: ${describeError(error)}`);
+  logEvent('ws-server', 'error', 'storage_failure', {
+    action,
+    code,
+    error: describeError(error),
+  });
 }
 
 wss.on('connection', (ws: WebSocket) => {
-  console.log('Client connected. Total clients:', wss.clients.size);
+  logEvent('ws-server', 'info', 'client_connected', { client_count: wss.clients.size });
 
   ws.on('message', (data: Buffer) => {
     let parsed: {
@@ -359,7 +398,9 @@ wss.on('connection', (ws: WebSocket) => {
       try {
         actionResult = await applyGameAction(parsed);
       } catch (error) {
-        console.error('Unexpected failure handling action:', error instanceof Error ? error.message : error);
+        logEvent('ws-server', 'error', 'game_action_failed', {
+          error_name: error instanceof Error ? error.name : 'UnknownError',
+        });
         actionResult = { error: 'The action could not be completed.' };
       }
 
@@ -374,11 +415,11 @@ wss.on('connection', (ws: WebSocket) => {
 
   ws.on('close', () => {
     lobbySubscribers.delete(ws);
-    console.log('Client disconnected. Total clients:', wss.clients.size);
+    logEvent('ws-server', 'info', 'client_disconnected', { client_count: wss.clients.size });
   });
 
   ws.on('error', (err: Error) => {
-    console.error('WebSocket error:', err.message);
+    logEvent('ws-server', 'error', 'websocket_error', { error_name: err.name });
   });
 });
 
@@ -393,7 +434,7 @@ async function start() {
     await store.createRoom(toPersistedRoom(defaultRoom));
     storeSession(defaultRoom);
   }
-  console.log(`Restored ${gameSessions.size} room(s) from storage`);
+  logEvent('ws-server', 'info', 'rooms_restored', { room_count: gameSessions.size });
 
   httpServer.on('upgrade', (request, socket, head) => {
     wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request));
@@ -402,14 +443,20 @@ async function start() {
     httpServer.once('error', reject);
     httpServer.listen(port, resolve);
   });
-  console.log(`Bingo WebSocket server running on ws://localhost:${port}`);
+  logEvent('ws-server', 'info', 'service_started', { port });
 }
 
 async function shutdown() {
-  console.log('\nShutting down WebSocket server...');
+  logEvent('ws-server', 'info', 'service_shutdown_started');
   wss.close();
   httpServer.close();
-  await store?.close().catch(() => undefined);
+  try {
+    await store?.close();
+  } catch (error) {
+    logEvent('ws-server', 'error', 'storage_shutdown_failed', {
+      error_name: error instanceof Error ? error.name : 'UnknownError',
+    });
+  }
   process.exit(0);
 }
 
@@ -417,6 +464,8 @@ process.on('SIGINT', () => void shutdown());
 process.on('SIGTERM', () => void shutdown());
 
 start().catch((error) => {
-  console.error(`Bingo WebSocket server could not start: ${describeError(error)}`);
+  logEvent('ws-server', 'error', 'service_start_failed', {
+    error: describeError(error),
+  });
   process.exit(1);
 });
